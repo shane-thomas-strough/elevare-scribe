@@ -189,6 +189,63 @@ This project operates under a permanent professional engineering standard. No ex
 - Audio has visual-only fallback (AudioFallback.tsx)
 - No raw errors shown to users
 
+## Environment Variables
+
+All secrets live in `.env.local` (never committed to git). The committable reference template is `.env.example`.
+
+| Variable | Scope | Description |
+|----------|-------|-------------|
+| `NEXT_PUBLIC_R2_BASE` | Client | Cloudflare R2 public base URL for audio CDN |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Client | Stripe publishable key (safe to expose) |
+| `STRIPE_SECRET_KEY` | Server only | Stripe secret key -- never expose client-side |
+| `STRIPE_WEBHOOK_SECRET` | Server only | Stripe webhook signing secret for signature verification |
+| `STRIPE_FOUNDING_ARTIST_PRICE_ID` | Server only | Stripe Price ID for $149 Founding Artist one-time product |
+| `STRIPE_PRO_MONTHLY_PRICE_ID` | Server only | Stripe Price ID for $12/month Pro subscription |
+| `STRIPE_PRO_ANNUAL_PRICE_ID` | Server only | Stripe Price ID for $10/month annual Pro subscription |
+| `NEXT_PUBLIC_APP_URL` | Client | Full production URL (e.g. `https://elevarescribe.com`) |
+| `NEXT_PUBLIC_SUPABASE_URL` | Client | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server only | Supabase service role key -- never expose client-side |
+
+**Rules:**
+- Real values go in `.env.local` only -- this file is gitignored via `.env*.local`
+- `.env.example` contains placeholder values and is committed to git as a reference
+- `NEXT_PUBLIC_` prefixed vars are embedded in the client bundle -- only use for non-secret values
+- Server-only vars (`STRIPE_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, etc.) are only accessible in API routes
+
+**Updating Vercel env vars from `.env.local`:**
+```bash
+vercel env rm <NAME> production --yes
+vercel env add <NAME> production --value "<value>" --yes
+vercel --prod --yes  # redeploy to pick up changes
+```
+
+## Key Rotation Procedure
+
+**Never paste secrets into chat, PRs, issues, or any logged context.** Rotate keys using the service dashboards and update Vercel directly from `.env.local`.
+
+### Stripe key rotation
+1. Go to dashboard.stripe.com > Developers > API Keys
+2. Click "Roll key" on the secret key -- Stripe generates a new one immediately
+3. Copy the new `sk_live_...` value
+4. Update `.env.local` locally with the new value
+5. Update Vercel: `vercel env rm STRIPE_SECRET_KEY production --yes && vercel env add STRIPE_SECRET_KEY production --value "sk_live_NEW_KEY" --yes`
+6. For webhook secret: Developers > Webhooks > your endpoint > Roll secret
+7. Update `STRIPE_WEBHOOK_SECRET` in `.env.local` and Vercel the same way
+8. Redeploy: `vercel --prod --yes`
+
+### Supabase key rotation
+1. Go to supabase.com > Project Settings > API
+2. Click "Generate a new key" for the service role key
+3. Copy the new `ey...` value
+4. Update `.env.local` locally
+5. Update Vercel: `vercel env rm SUPABASE_SERVICE_ROLE_KEY production --yes && vercel env add SUPABASE_SERVICE_ROLE_KEY production --value "eyNEW_KEY" --yes`
+6. Redeploy: `vercel --prod --yes`
+
+### After any rotation
+- Verify the deployment works: check `https://elevarescribe.com/health`
+- Test a waitlist signup to confirm Supabase connectivity
+- Test a Stripe checkout flow to confirm payment works
+
 ## Confidentiality
 
 This project is pre-seed / founding stage. All documents are confidential to Elevare Edge LLC.
