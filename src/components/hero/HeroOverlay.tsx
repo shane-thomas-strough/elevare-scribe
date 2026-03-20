@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useAppStore } from "@/store/useAppStore";
 import DemoInput from "./DemoInput";
 
 export default function HeroOverlay() {
@@ -80,6 +81,22 @@ export default function HeroOverlay() {
           <span>Udio ✓</span>
           <span>MP3/WAV ✓</span>
           <span>YouTube ✓</span>
+        </motion.div>
+
+        {/* CTA */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.9 }}
+          className="mt-6"
+        >
+          <button
+            type="button"
+            onClick={() => useAppStore.getState().openWaitlistModal()}
+            className="px-6 py-3 rounded-xl border border-es-cyan/30 text-es-cyan font-inter text-sm font-medium hover:bg-es-cyan/10 transition-colors"
+          >
+            Apply for Founding Artist Access
+          </button>
         </motion.div>
       </div>
     </div>

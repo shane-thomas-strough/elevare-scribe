@@ -2,11 +2,34 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { useAppStore } from "@/store/useAppStore";
 
 export default function PricingSection() {
   const [billing, setBilling] = useState<"monthly" | "annual">("monthly");
+  const [loadingTier, setLoadingTier] = useState<string | null>(null);
 
   const proPrice = billing === "monthly" ? 12 : 10;
+
+  const handleCheckout = async (tier: string) => {
+    setLoadingTier(tier);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tier }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert("Something went wrong. Please try again.");
+      }
+    } catch {
+      alert("Something went wrong. Please try again.");
+    } finally {
+      setLoadingTier(null);
+    }
+  };
 
   return (
     <section
@@ -98,6 +121,7 @@ export default function PricingSection() {
 
             <button
               type="button"
+              onClick={() => useAppStore.getState().openWaitlistModal()}
               className="mt-8 w-full rounded-lg border border-es-border bg-es-bg-tertiary px-6 py-3 font-inter text-sm font-medium text-es-text-primary transition-colors hover:bg-white/[0.06]"
             >
               Get Started Free
@@ -155,9 +179,13 @@ export default function PricingSection() {
 
             <button
               type="button"
-              className="mt-8 w-full rounded-lg bg-es-cyan px-6 py-3 font-inter text-sm font-semibold text-es-bg-primary transition-opacity hover:opacity-90"
+              onClick={() => handleCheckout(billing === "annual" ? "pro-annual" : "pro-monthly")}
+              disabled={loadingTier === "pro-monthly" || loadingTier === "pro-annual"}
+              className="mt-8 w-full rounded-lg bg-es-cyan px-6 py-3 font-inter text-sm font-semibold text-es-bg-primary transition-opacity hover:opacity-90 disabled:opacity-60"
             >
-              Start Pro Trial
+              {loadingTier === "pro-monthly" || loadingTier === "pro-annual"
+                ? "Processing..."
+                : "Start Pro Trial"}
             </button>
           </motion.div>
 
@@ -203,9 +231,13 @@ export default function PricingSection() {
 
             <button
               type="button"
-              className="mt-8 w-full rounded-lg bg-es-gold px-6 py-3 font-inter text-sm font-semibold text-es-bg-primary transition-opacity hover:opacity-90"
+              onClick={() => handleCheckout("founding-artist")}
+              disabled={loadingTier === "founding-artist"}
+              className="mt-8 w-full rounded-lg bg-es-gold px-6 py-3 font-inter text-sm font-semibold text-es-bg-primary transition-opacity hover:opacity-90 disabled:opacity-60"
             >
-              Claim Founding Artist Access
+              {loadingTier === "founding-artist"
+                ? "Processing..."
+                : "Claim Founding Artist Access"}
             </button>
 
             <p className="mt-3 text-center font-inter text-xs text-es-text-tertiary">

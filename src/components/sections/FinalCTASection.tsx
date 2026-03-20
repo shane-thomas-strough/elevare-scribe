@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useAppStore } from "@/store/useAppStore";
 
 function CheckIcon() {
   return (
@@ -82,6 +83,7 @@ export default function FinalCTASection() {
         >
           <button
             type="button"
+            onClick={() => useAppStore.getState().openWaitlistModal()}
             className="inline-block rounded-xl bg-es-cyan px-8 py-4 text-lg font-semibold text-es-bg-primary transition-opacity hover:opacity-90"
           >
             Apply for Founding Artist Access
@@ -110,6 +112,7 @@ export default function FinalCTASection() {
         >
           <button
             type="button"
+            onClick={() => useAppStore.getState().openWaitlistModal()}
             className="text-es-text-secondary underline transition-colors hover:text-es-text-primary"
           >
             Start Free — No credit card required

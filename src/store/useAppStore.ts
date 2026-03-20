@@ -20,6 +20,7 @@ interface AppState {
   currentPitchShift: number;
   demoLinkPasted: boolean;
   activeStemVisualization: string[];
+  isWaitlistModalOpen: boolean;
 
   setAudioContextStarted: (started: boolean) => void;
   setStemVolume: (stem: keyof StemVolumes, volume: number) => void;
@@ -28,6 +29,8 @@ interface AppState {
   setCurrentPitchShift: (shift: number) => void;
   setDemoLinkPasted: (pasted: boolean) => void;
   setActiveStemVisualization: (stems: string[]) => void;
+  openWaitlistModal: () => void;
+  closeWaitlistModal: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -38,6 +41,7 @@ export const useAppStore = create<AppState>((set) => ({
   currentPitchShift: 0,
   demoLinkPasted: false,
   activeStemVisualization: [],
+  isWaitlistModalOpen: false,
 
   setAudioContextStarted: (started) => set({ audioContextStarted: started }),
   setStemVolume: (stem, volume) =>
@@ -50,4 +54,6 @@ export const useAppStore = create<AppState>((set) => ({
   setDemoLinkPasted: (pasted) => set({ demoLinkPasted: pasted }),
   setActiveStemVisualization: (stems) =>
     set({ activeStemVisualization: stems }),
+  openWaitlistModal: () => set({ isWaitlistModalOpen: true }),
+  closeWaitlistModal: () => set({ isWaitlistModalOpen: false }),
 }));

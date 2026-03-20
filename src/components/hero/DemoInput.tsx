@@ -144,14 +144,19 @@ export default function DemoInput() {
               Create a free account to see your full chart.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <button className="px-8 py-3 rounded-xl bg-es-cyan text-es-bg-primary font-inter font-semibold text-base hover:brightness-110 transition-all duration-200"
+              <button
+                onClick={() => useAppStore.getState().openWaitlistModal()}
+                className="px-8 py-3 rounded-xl bg-es-cyan text-es-bg-primary font-inter font-semibold text-base hover:brightness-110 transition-all duration-200"
                 style={{
                   boxShadow: "0 0 30px rgba(0, 212, 255, 0.3)",
                 }}
               >
                 Get Started Free
               </button>
-              <button className="px-6 py-3 rounded-xl border border-es-text-tertiary/30 text-es-text-secondary font-inter text-sm hover:border-es-cyan/40 hover:text-es-text-primary transition-all duration-200">
+              <button
+                onClick={() => useAppStore.getState().openWaitlistModal()}
+                className="px-6 py-3 rounded-xl border border-es-text-tertiary/30 text-es-text-secondary font-inter text-sm hover:border-es-cyan/40 hover:text-es-text-primary transition-all duration-200"
+              >
                 Apply for Founding Artist Access
               </button>
             </div>

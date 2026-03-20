@@ -2,7 +2,9 @@ import dynamic from "next/dynamic";
 
 const NavBar = dynamic(() => import("@/components/sections/NavBar"), { ssr: false });
 const HeroSection = dynamic(() => import("@/components/hero/HeroSection"), { ssr: false });
-const ProblemSection = dynamic(() => import("@/components/sections/ProblemSection"), { ssr: false });
+const ProblemSection = dynamic(() => import("@/components/sections/ProblemSection"), {
+  ssr: false,
+});
 const ValuePropsSection = dynamic(() => import("@/components/sections/ValuePropsSection"), {
   ssr: false,
 });
@@ -28,6 +30,8 @@ const FinalCTASection = dynamic(() => import("@/components/sections/FinalCTASect
   ssr: false,
 });
 const Footer = dynamic(() => import("@/components/sections/Footer"), { ssr: false });
+const WaitlistModal = dynamic(() => import("@/components/waitlist/WaitlistModal"), { ssr: false });
+const FloatingCTA = dynamic(() => import("@/components/ui/FloatingCTA"), { ssr: false });
 
 export default function Home() {
   return (
@@ -45,6 +49,8 @@ export default function Home() {
       <FAQSection />
       <FinalCTASection />
       <Footer />
+      <WaitlistModal />
+      <FloatingCTA />
     </main>
   );
 }
