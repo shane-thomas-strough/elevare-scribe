@@ -3,7 +3,31 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useAppStore } from "@/store/useAppStore";
-import { AUDIO } from "@/config/audio";
+
+/**
+ * Step6Preview — true multi-track stem mixer. Four independent Tone.Player
+ * instances route through four independent Tone.Channel nodes to destination.
+ * Each UI slider controls ONLY its corresponding channel volume — no averaging,
+ * no master gain tricks. Players start simultaneously for perfect sync.
+ *
+ * Architecture: Player(vocal) → Channel(vocal) → Destination
+ *               Player(guitar) → Channel(guitar) → Destination
+ *               Player(bass) → Channel(bass) → Destination
+ *               Player(drums) → Channel(drums) → Destination
+ */
+
+/**
+ * Per-stem audio file URLs. When Demucs stem separation is run on the
+ * master track, the resulting files are uploaded to R2 and their URLs
+ * are placed here. Each stem is a separate isolated audio file.
+ */
+// TODO: Insert R2 stem URLs here after running Demucs on Double Overhead
+const STEM_URLS = {
+  vocal: "",
+  guitar: "",
+  bass: "",
+  drums: "",
+} as const;
 
 const STEMS = [
   { key: "vocal" as const, label: "Vocals", color: "#00D4FF" },
@@ -12,9 +36,23 @@ const STEMS = [
   { key: "drums" as const, label: "Drums", color: "#00FF88" },
 ];
 
-const AUDIO_SRC = AUDIO.DOUBLE_OVERHEAD;
+/** True if at least one stem URL is configured */
+const STEMS_AVAILABLE = Object.values(STEM_URLS).some((url) => url.length > 0);
 
 type ExportPhase = "idle" | "exporting" | "done";
+
+/** Convert a 0-1 linear volume to decibels. 0 = -Infinity dB, 1 = 0 dB */
+function linearToDb(v: number): number {
+  if (v <= 0) return -Infinity;
+  return 20 * Math.log10(v);
+}
+
+interface StemRig {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  players: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  channels: Record<string, any>;
+}
 
 export default function Step6Preview() {
   const currentStemVolumes = useAppStore((s) => s.currentStemVolumes);
@@ -23,48 +61,101 @@ export default function Step6Preview() {
   const [exportPhase, setExportPhase] = useState<ExportPhase>("idle");
   const [exportProgress, setExportProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const playerRef = useRef<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const rigRef = useRef<StemRig | null>(null);
 
+  /**
+   * Toggle playback. On first play: initializes Tone.js, creates four
+   * Player → Channel → Destination chains, waits for all buffers to load,
+   * then starts all players simultaneously for perfect sync.
+   */
   const togglePreview = useCallback(async () => {
     if (isPlaying) {
-      playerRef.current?.stop();
+      if (rigRef.current) {
+        Object.values(rigRef.current.players).forEach((p) => p.stop());
+      }
       setIsPlaying(false);
       return;
     }
-    if (!playerRef.current) {
+
+    if (!STEMS_AVAILABLE) {
+      // Graceful fallback: no stems uploaded yet — show notice, don't crash
+      return;
+    }
+
+    try {
+      setIsLoading(true);
       const Tone = await import("tone");
       await Tone.start();
       setAudioContextStarted(true);
-      const player = new Tone.Player({
-        url: AUDIO_SRC,
-        loop: true,
-      }).toDestination();
-      playerRef.current = player;
-      await new Promise<void>((resolve) => {
-        if (player.loaded) resolve();
-        else player.buffer.onload = () => resolve();
-      });
-    }
-    playerRef.current.start();
-    setIsPlaying(true);
-  }, [isPlaying, setAudioContextStarted]);
 
-  // Adjust volume when faders move (simulated — real stem separation would have 4 players)
+      if (!rigRef.current) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const players: Record<string, any> = {};
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const channels: Record<string, any> = {};
+
+        for (const stem of STEMS) {
+          const url = STEM_URLS[stem.key];
+          if (!url) continue;
+
+          const channel = new Tone.Channel({
+            volume: linearToDb(currentStemVolumes[stem.key]),
+          }).toDestination();
+
+          const player = new Tone.Player({
+            url,
+            loop: true,
+          }).connect(channel);
+
+          players[stem.key] = player;
+          channels[stem.key] = channel;
+        }
+
+        rigRef.current = { players, channels };
+        await Tone.loaded();
+      }
+
+      // Sync start: all players trigger at the same Tone.now() timestamp
+      const now = rigRef.current.players["vocal"]
+        ? await import("tone").then((T) => T.now())
+        : 0;
+      Object.values(rigRef.current.players).forEach((p) => p.start(now));
+      setIsPlaying(true);
+    } catch (err) {
+      console.error("Step6Preview: failed to initialize multi-track playback", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isPlaying, setAudioContextStarted, currentStemVolumes]);
+
+  /**
+   * Apply individual stem volumes directly to their Tone.Channel nodes.
+   * No averaging. Each slider controls ONLY its corresponding channel.
+   */
   useEffect(() => {
-    if (playerRef.current) {
-      const avg = (currentStemVolumes.vocal + currentStemVolumes.guitar +
-                   currentStemVolumes.bass + currentStemVolumes.drums) / 4;
-      playerRef.current.volume.value = avg > 0 ? (avg - 1) * 20 : -Infinity;
+    if (!rigRef.current) return;
+    const { channels } = rigRef.current;
+
+    for (const stem of STEMS) {
+      const channel = channels[stem.key];
+      if (channel) {
+        channel.volume.value = linearToDb(currentStemVolumes[stem.key]);
+      }
     }
   }, [currentStemVolumes]);
 
-  // Cleanup
+  /** Cleanup: stop and dispose all players and channels on unmount */
   useEffect(() => {
     return () => {
-      playerRef.current?.stop();
-      playerRef.current?.dispose();
-      playerRef.current = null;
+      if (rigRef.current) {
+        Object.values(rigRef.current.players).forEach((p) => {
+          p.stop();
+          p.dispose();
+        });
+        Object.values(rigRef.current.channels).forEach((c) => c.dispose());
+        rigRef.current = null;
+      }
     };
   }, []);
 
@@ -95,21 +186,31 @@ export default function Step6Preview() {
       {/* Track label + preview */}
       <div className="flex items-center justify-between">
         <span className="text-es-text-secondary text-xs font-inter">
-          Double Overhead
+          Double Overhead — Stem Mixer
         </span>
         <button
           onClick={togglePreview}
+          disabled={!STEMS_AVAILABLE || isLoading}
           className={`px-3 py-1 rounded-md text-xs font-mono border transition-colors ${
             isPlaying
               ? "border-es-cyan/40 text-es-cyan bg-es-cyan/10"
-              : "border-es-border text-es-text-tertiary hover:text-es-text-secondary"
+              : !STEMS_AVAILABLE
+                ? "border-es-border text-es-text-tertiary/40 cursor-not-allowed"
+                : "border-es-border text-es-text-tertiary hover:text-es-text-secondary"
           }`}
         >
-          {isPlaying ? "Stop" : "Preview"}
+          {isLoading ? "Loading..." : isPlaying ? "Stop" : "Preview"}
         </button>
       </div>
 
-      {/* Faders */}
+      {/* Stems not available notice */}
+      {!STEMS_AVAILABLE && (
+        <p className="text-es-text-tertiary text-[10px] font-mono text-center -mt-2">
+          Stems pending — run Demucs to separate tracks
+        </p>
+      )}
+
+      {/* Per-stem faders — each controls ONLY its channel */}
       {STEMS.map((stem) => (
         <div key={stem.key} className="flex items-center gap-3">
           <span
