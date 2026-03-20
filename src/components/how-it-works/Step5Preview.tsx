@@ -27,6 +27,7 @@ export default function Step5Preview() {
 
   // Load OSMD
   useEffect(() => {
+    if (typeof window === "undefined") return;
     if (!osmdContainerRef.current) return;
     let cancelled = false;
 

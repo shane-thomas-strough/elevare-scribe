@@ -119,6 +119,7 @@ export default function Step3Preview() {
 
   // Initialize OSMD
   useEffect(() => {
+    if (typeof window === "undefined") return;
     if (!originalXml || !osmdContainerRef.current) return;
 
     let cancelled = false;
