@@ -1,28 +1,75 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useAppStore } from "@/store/useAppStore";
 
-const stems = [
+const STEMS = [
   { key: "vocal" as const, label: "Vocals", color: "#00D4FF" },
   { key: "guitar" as const, label: "Guitar", color: "#C7973A" },
   { key: "bass" as const, label: "Bass", color: "#7B2FBE" },
   { key: "drums" as const, label: "Drums", color: "#00FF88" },
 ];
 
+const AUDIO_SRC = "/audio/double-overhead-demo.mp3";
+
 type ExportPhase = "idle" | "exporting" | "done";
 
 export default function Step6Preview() {
   const currentStemVolumes = useAppStore((s) => s.currentStemVolumes);
   const setStemVolume = useAppStore((s) => s.setStemVolume);
+  const setAudioContextStarted = useAppStore((s) => s.setAudioContextStarted);
   const [exportPhase, setExportPhase] = useState<ExportPhase>("idle");
   const [exportProgress, setExportProgress] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const playerRef = useRef<any>(null);
+
+  const togglePreview = useCallback(async () => {
+    if (isPlaying) {
+      playerRef.current?.stop();
+      setIsPlaying(false);
+      return;
+    }
+    if (!playerRef.current) {
+      const Tone = await import("tone");
+      await Tone.start();
+      setAudioContextStarted(true);
+      const player = new Tone.Player({
+        url: AUDIO_SRC,
+        loop: true,
+      }).toDestination();
+      playerRef.current = player;
+      await new Promise<void>((resolve) => {
+        if (player.loaded) resolve();
+        else player.buffer.onload = () => resolve();
+      });
+    }
+    playerRef.current.start();
+    setIsPlaying(true);
+  }, [isPlaying, setAudioContextStarted]);
+
+  // Adjust volume when faders move (simulated — real stem separation would have 4 players)
+  useEffect(() => {
+    if (playerRef.current) {
+      const avg = (currentStemVolumes.vocal + currentStemVolumes.guitar +
+                   currentStemVolumes.bass + currentStemVolumes.drums) / 4;
+      playerRef.current.volume.value = avg > 0 ? (avg - 1) * 20 : -Infinity;
+    }
+  }, [currentStemVolumes]);
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      playerRef.current?.stop();
+      playerRef.current?.dispose();
+      playerRef.current = null;
+    };
+  }, []);
 
   const handleExport = useCallback(() => {
     setExportPhase("exporting");
     setExportProgress(0);
-
     const start = performance.now();
     const duration = 2500;
     const animate = (now: number) => {
@@ -44,8 +91,25 @@ export default function Step6Preview() {
       transition={{ duration: 0.4 }}
       className="flex flex-col justify-center h-full px-6 gap-5"
     >
+      {/* Track label + preview */}
+      <div className="flex items-center justify-between">
+        <span className="text-es-text-secondary text-xs font-inter">
+          Double Overhead
+        </span>
+        <button
+          onClick={togglePreview}
+          className={`px-3 py-1 rounded-md text-xs font-mono border transition-colors ${
+            isPlaying
+              ? "border-es-cyan/40 text-es-cyan bg-es-cyan/10"
+              : "border-es-border text-es-text-tertiary hover:text-es-text-secondary"
+          }`}
+        >
+          {isPlaying ? "Stop" : "Preview"}
+        </button>
+      </div>
+
       {/* Faders */}
-      {stems.map((stem) => (
+      {STEMS.map((stem) => (
         <div key={stem.key} className="flex items-center gap-3">
           <span
             className="w-16 text-xs font-inter font-medium text-right"

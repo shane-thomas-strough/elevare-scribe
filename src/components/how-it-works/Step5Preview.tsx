@@ -4,11 +4,17 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useAppStore } from "@/store/useAppStore";
 
+const TRACKS = [
+  { id: "no-hay-quizas", label: "No Hay Quizas", url: "/audio/no-hay-quizas-demo.mp3" },
+  { id: "hammocks", label: "Hammocks and Hardhats", url: "/audio/hammocks-and-hardhats-demo.mp3" },
+];
+
 export default function Step5Preview() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [tempo, setTempo] = useState(100);
   const [looping, setLooping] = useState(true);
   const [cursorPos, setCursorPos] = useState(0);
+  const [activeTrack, setActiveTrack] = useState(0);
   const osmdContainerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const osmdRef = useRef<any>(null);
@@ -56,7 +62,7 @@ export default function Step5Preview() {
       return;
     }
     const speed = tempo / 100;
-    const duration = 10000 / speed; // 10 seconds scaled by tempo
+    const duration = 10000 / speed;
     const startTime = performance.now();
 
     const animate = (now: number) => {
@@ -76,6 +82,21 @@ export default function Step5Preview() {
     };
   }, [isPlaying, tempo, looping]);
 
+  // Switch track
+  const switchTrack = useCallback(async (idx: number) => {
+    if (idx === activeTrack) return;
+
+    // Stop current playback
+    if (toneRef.current?.player) {
+      toneRef.current.player.stop();
+      toneRef.current.player.dispose();
+      toneRef.current = null;
+    }
+    setIsPlaying(false);
+    setCursorPos(0);
+    setActiveTrack(idx);
+  }, [activeTrack]);
+
   const togglePlayback = useCallback(async () => {
     if (isPlaying) {
       toneRef.current?.player?.stop();
@@ -83,13 +104,13 @@ export default function Step5Preview() {
       return;
     }
 
-    // Initialize Tone.js on first play
+    // Initialize Tone.js player with the current track
     if (!toneRef.current) {
       const Tone = await import("tone");
       await Tone.start();
       setAudioContextStarted(true);
       const player = new Tone.Player({
-        url: "/audio/no-hay-quizas-demo.mp3",
+        url: TRACKS[activeTrack].url,
         loop: true,
       }).toDestination();
       toneRef.current = { player, module: Tone };
@@ -103,7 +124,7 @@ export default function Step5Preview() {
     toneRef.current.player.loop = looping;
     toneRef.current.player.start();
     setIsPlaying(true);
-  }, [isPlaying, tempo, looping, setAudioContextStarted]);
+  }, [isPlaying, tempo, looping, setAudioContextStarted, activeTrack]);
 
   // Update playback rate on tempo change
   useEffect(() => {
@@ -128,6 +149,23 @@ export default function Step5Preview() {
       transition={{ duration: 0.4 }}
       className="flex flex-col h-full"
     >
+      {/* Track switcher */}
+      <div className="px-4 pt-3 pb-2 border-b border-es-border flex items-center gap-2">
+        {TRACKS.map((track, idx) => (
+          <button
+            key={track.id}
+            onClick={() => switchTrack(idx)}
+            className={`px-3 py-1.5 rounded-md text-xs font-inter transition-colors ${
+              idx === activeTrack
+                ? "bg-es-cyan/10 border border-es-cyan/40 text-es-cyan"
+                : "border border-es-border text-es-text-tertiary hover:text-es-text-secondary"
+            }`}
+          >
+            {track.label}
+          </button>
+        ))}
+      </div>
+
       {/* Sheet music with cursor */}
       <div className="relative flex-1 overflow-hidden px-4 py-4">
         <div

@@ -34,3 +34,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# demo source files (large WAVs)
+/demo-songs/
+
+# large WAV files in public (use MP3 versions for git)
+public/audio/*.wav
