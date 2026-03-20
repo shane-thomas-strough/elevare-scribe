@@ -112,7 +112,7 @@ export default function Step5Preview() {
       await Tone.start();
       setAudioContextStarted(true);
       const player = new Tone.Player({
-        url: TRACKS[activeTrack].url,
+        url: TRACKS[activeTrack]?.url ?? TRACKS[0]!.url,
         loop: true,
       }).toDestination();
       toneRef.current = { player, module: Tone };

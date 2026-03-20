@@ -23,7 +23,7 @@ function chromaticToStep(idx: number): { step: string; alter: number } {
     { step: "F", alter: 1 }, { step: "G", alter: 0 }, { step: "G", alter: 1 },
     { step: "A", alter: 0 }, { step: "A", alter: 1 }, { step: "B", alter: 0 },
   ];
-  return map[idx % 12];
+  return map[idx % 12] ?? { step: "C", alter: 0 };
 }
 
 function transposeMusicXML(xml: string, semitones: number): string {
@@ -83,7 +83,7 @@ function transposeMusicXML(xml: string, semitones: number): string {
     const chromIdx = CHROMATIC.indexOf(step);
     if (chromIdx >= 0) {
       const newChrom = (chromIdx + semitones + 120) % 12;
-      el.textContent = CHROMATIC[newChrom];
+      el.textContent = CHROMATIC[newChrom] ?? "C";
     }
   });
 

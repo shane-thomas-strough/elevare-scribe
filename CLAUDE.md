@@ -56,7 +56,14 @@ Elevare Scribe is the end-to-end operating system for independent AI-assisted mu
 npm install          # Install dependencies
 npm run dev          # Start dev server (Next.js)
 npm run build        # Production build
-npm run lint         # Lint
+npm run start        # Start production server
+npm run lint         # ESLint (includes jsx-a11y)
+npm run typecheck    # TypeScript strict mode check
+npm run test         # Vitest unit tests
+npm run test:watch   # Vitest in watch mode
+npm run test:e2e     # Playwright E2E tests
+npm run format       # Prettier format
+npm run analyze      # Bundle analysis (ANALYZE=true)
 ```
 
 ## Architecture
@@ -141,6 +148,46 @@ These must exist before their respective phases:
 ## Key Product Sections (13 total)
 
 Navigation (sticky, glass morphism) > Hero (WebGL + demo input) > Problem > Value Props (3 cards) > How It Works (6 interactive steps) > Features Grid (6 cards) + Gig Mode (browser takeover) > Differentiation > Founder Story (GSAP horizontal) > Who It's For (4 persona cards) > Social Proof > Pricing (4 tiers: Free/$0, Pro/$12mo, Founding Artist/$149 once, Enterprise/$99mo) > FAQ (accordion) > Final CTA > Footer
+
+## SSR-Safe Import Policy
+
+These libraries MUST be imported with `dynamic(() => import(...), { ssr: false })` or inside `useEffect` with dynamic `import()`:
+- `three`, `@react-three/fiber`, `@react-three/drei` -- WebGL requires browser globals
+- `tone` -- Web Audio API requires browser context
+- `opensheetmusicdisplay` -- DOM rendering requires browser environment
+- `gsap`, `gsap/ScrollTrigger` -- ScrollTrigger requires DOM measurements
+
+Never import these at module top level in components that may SSR. See `docs/SSR-GOTCHAS.md` for full policy.
+
+## Engineering Standard (Permanent)
+
+This project operates under a permanent professional engineering standard. No exceptions, no shortcuts, no partial implementations.
+
+**Non-Claim Policy:** Do not claim work is complete unless:
+- Every required file exists
+- `npm run lint` passes with zero errors
+- `npm run typecheck` passes with zero errors
+- `npm run test` passes
+- `npm run build` passes
+- Evidence is shown for each claim
+
+**Quality gates enforced by CI:**
+- ESLint with jsx-a11y accessibility rules
+- TypeScript strict mode with `noUncheckedIndexedAccess`
+- Vitest unit tests (80% coverage threshold)
+- Playwright E2E smoke tests
+- Husky pre-commit hooks (Prettier + ESLint + TypeScript)
+
+**Documentation requirements:**
+- All docs in `docs/` directory must stay current
+- CHANGELOG.md updated for every version
+- CONTRIBUTING.md followed for all PRs
+
+**Error handling requirements:**
+- Global ErrorBoundary wraps the app
+- WebGL has CSS gradient fallback (WebGLFallback.tsx)
+- Audio has visual-only fallback (AudioFallback.tsx)
+- No raw errors shown to users
 
 ## Confidentiality
 

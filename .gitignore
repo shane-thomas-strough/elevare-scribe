@@ -41,3 +41,16 @@ next-env.d.ts
 # audio files served from R2
 public/audio/*.wav
 public/audio/*.mp3
+
+# Audio files served from R2
+*.wav
+*.mp3
+
+# Test artifacts
+/coverage
+/test-results
+/playwright-report
+/e2e-results
+
+# Bundle analyzer
+.next/analyze

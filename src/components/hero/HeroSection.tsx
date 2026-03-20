@@ -1,22 +1,50 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import HeroOverlay from "./HeroOverlay";
+import WebGLFallback from "./WebGLFallback";
 import { useAppStore } from "@/store/useAppStore";
 
 // Dynamic import to avoid SSR issues with Three.js
-const HeroCanvas = dynamic(() => import("./HeroCanvas"), {
-  ssr: false,
-  loading: () => (
-    <div className="absolute inset-0 w-full h-full bg-es-bg-primary" />
-  ),
-});
+const HeroCanvas = dynamic(
+  () => import("./HeroCanvas").catch(() => {
+    // Return a component that signals failure via an error prop
+    return { default: () => <CanvasLoadError /> };
+  }),
+  {
+    ssr: false,
+    loading: () => <WebGLFallback />,
+  },
+);
+
+// Sentinel component rendered when dynamic import fails
+function CanvasLoadError() {
+  return <div data-canvas-error="true" style={{ display: "none" }} />;
+}
 
 export default function HeroSection() {
   const setMouseCoordinates = useAppStore((s) => s.setMouseCoordinates);
   const rafRef = useRef<number | null>(null);
   const mouseRef = useRef({ x: 0, y: 0 });
+  const [canvasFailed, setCanvasFailed] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
+
+  // Detect if HeroCanvas failed to load by checking for the sentinel element
+  useEffect(() => {
+    if (!sectionRef.current) return;
+    const observer = new MutationObserver(() => {
+      if (sectionRef.current?.querySelector("[data-canvas-error]")) {
+        setCanvasFailed(true);
+      }
+    });
+    observer.observe(sectionRef.current, { childList: true, subtree: true });
+    // Also check immediately
+    if (sectionRef.current.querySelector("[data-canvas-error]")) {
+      setCanvasFailed(true);
+    }
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -42,8 +70,8 @@ export default function HeroSection() {
   }, [setMouseCoordinates]);
 
   return (
-    <section className="relative w-full h-screen overflow-hidden">
-      <HeroCanvas />
+    <section ref={sectionRef} className="relative w-full h-screen overflow-hidden">
+      {canvasFailed ? <WebGLFallback /> : <HeroCanvas />}
       <HeroOverlay />
     </section>
   );

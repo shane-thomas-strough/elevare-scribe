@@ -69,8 +69,9 @@ export default function Step4Preview() {
             <span className="text-es-text-tertiary text-[9px] font-mono">-1</span>
           </div>
           <div className="flex-1">
-            <label className="text-es-text-tertiary text-[10px] font-inter block mb-1">Lyrics</label>
+            <label htmlFor="lyrics-input" className="text-es-text-tertiary text-[10px] font-inter block mb-1">Lyrics</label>
             <input
+              id="lyrics-input"
               type="text"
               defaultValue="qui-zas"
               className="w-full px-2 py-1 rounded bg-es-bg-secondary border border-es-border text-es-text-primary text-xs font-mono focus:outline-none focus:border-es-cyan/40"
