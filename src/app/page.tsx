@@ -8,12 +8,17 @@ const GigModeSection = dynamic(() => import("@/components/gig-mode/GigModeSectio
   ssr: false,
 });
 
+const FounderStory = dynamic(() => import("@/components/founder-story/FounderStory"), {
+  ssr: false,
+});
+
 export default function Home() {
   return (
     <main>
       <HeroSection />
       <HowItWorks />
       <GigModeSection />
+      <FounderStory />
     </main>
   );
 }
