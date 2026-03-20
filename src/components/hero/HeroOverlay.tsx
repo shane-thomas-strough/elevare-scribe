@@ -7,7 +7,7 @@ import DemoInput from "./DemoInput";
 export default function HeroOverlay() {
   return (
     <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center z-10 pointer-events-none px-4">
-      <div className="max-w-3xl w-full text-center pointer-events-auto">
+      <div className="max-w-3xl w-full text-center">
         {/* Badge */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -61,11 +61,12 @@ export default function HeroOverlay() {
           place.
         </motion.p>
 
-        {/* Demo Input */}
+        {/* Demo Input — pointer-events-auto so input field is clickable */}
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.6 }}
+          className="pointer-events-auto"
         >
           <DemoInput />
         </motion.div>
@@ -83,12 +84,12 @@ export default function HeroOverlay() {
           <span>YouTube ✓</span>
         </motion.div>
 
-        {/* CTA */}
+        {/* CTA — pointer-events-auto so button is clickable */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.9 }}
-          className="mt-6"
+          className="mt-6 pointer-events-auto"
         >
           <button
             type="button"

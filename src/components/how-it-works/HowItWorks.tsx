@@ -50,9 +50,9 @@ export default function HowItWorks() {
 
           ScrollTrigger.create({
             trigger: stepEl,
-            // Use center of viewport for more reliable triggering
             start: "top 60%",
             end: "bottom 40%",
+            invalidateOnRefresh: true,
             onEnter: () => setActiveStep(i),
             onEnterBack: () => setActiveStep(i),
           });
@@ -84,7 +84,7 @@ export default function HowItWorks() {
   return (
     <section
       ref={sectionRef}
-      className="relative bg-es-bg-primary py-24 px-4 sm:px-8 lg:px-16"
+      className="relative bg-es-bg-primary pt-24 pb-[50vh] px-4 sm:px-8 lg:px-16"
       style={{ zIndex: 1 }}
     >
       {/* Section header — offset from top to avoid nav overlap */}
@@ -119,8 +119,8 @@ export default function HowItWorks() {
 
         {/* Right column: preview pane — CSS sticky (not GSAP pin) */}
         <div className="hidden lg:block w-full lg:w-[60%]">
-          {/* top-20 = 80px offset for navbar (h-16 + 16px breathing room) */}
-          <div className="sticky top-20" style={{ zIndex: 2 }}>
+          {/* top-24 = 96px offset for navbar (h-16 + 32px clearance for glass blur) */}
+          <div className="sticky top-24" style={{ zIndex: 2 }}>
             <PreviewPane activeStep={activeStep} />
           </div>
         </div>
