@@ -108,8 +108,6 @@ const fragmentShader = `
 
 function WaveformMesh() {
   const meshRef = useRef<THREE.Mesh>(null);
-  const mouseCoordinates = useAppStore((s) => s.mouseCoordinates);
-  const demoLinkPasted = useAppStore((s) => s.demoLinkPasted);
   const splitStartTime = useRef<number | null>(null);
 
   const uniforms = useMemo(
@@ -126,9 +124,13 @@ function WaveformMesh() {
     const elapsed = state.clock.getElapsedTime();
     uniforms.uTime.value = elapsed;
 
+    // Read mouse directly from Zustand store (not via React subscription)
+    // to avoid triggering React re-renders 60x/sec inside the R3F render loop
+    const { mouseCoordinates, demoLinkPasted } = useAppStore.getState();
+
     // Normalize mouse to 0-1 range
-    const mx = mouseCoordinates.x / (typeof window !== "undefined" ? window.innerWidth : 1);
-    const my = 1.0 - mouseCoordinates.y / (typeof window !== "undefined" ? window.innerHeight : 1);
+    const mx = mouseCoordinates.x / window.innerWidth;
+    const my = 1.0 - mouseCoordinates.y / window.innerHeight;
     uniforms.uMouse.value.set(mx, my);
 
     // Stem separation animation

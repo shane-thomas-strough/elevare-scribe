@@ -52,9 +52,10 @@ export default function HeroSection() {
       mouseRef.current.y = e.clientY;
     };
 
-    // Throttle updates to animation frames
+    // Throttle updates to animation frames — spread to create a new
+    // object reference each frame so Zustand detects the state change
     const updateStore = () => {
-      setMouseCoordinates(mouseRef.current);
+      setMouseCoordinates({ x: mouseRef.current.x, y: mouseRef.current.y });
       rafRef.current = requestAnimationFrame(updateStore);
     };
 
