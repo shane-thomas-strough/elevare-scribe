@@ -1,65 +1,120 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-
-/** No Hay Quizas chord progression used in the Gig Mode reveal */
-const CHORDS = ["Am", "F", "C", "G", "Em", "Am", "Dm", "E"];
+import { useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 /**
- * ChordDisplay — renders the No Hay Quizas chord progression as massive text
- * across the viewport. Chords are white text on a black background, invisible
- * by default. They become visible only where the SpotlightCursor illuminates
- * them via mix-blend-mode: screen. A subtle left-to-right drift animation
- * ensures chords slowly reveal even without mouse movement.
- *
- * @remarks Uses GSAP for the drift animation. Browser-only.
+ * Chord + lyric pairs for No Hay Quizás. Each entry represents one
+ * "beat" the musician advances through using Spacebar or arrow keys.
  */
-export default function ChordDisplay() {
-  const containerRef = useRef<HTMLDivElement>(null);
+const CHART = [
+  { chord: "Am", lyric: "No hay quizás en esta noche" },
+  { chord: "F", lyric: "Solo tú y el mar abierto" },
+  { chord: "C", lyric: "Las olas cantan lo que siento" },
+  { chord: "G", lyric: "Y el viento sabe mi secreto" },
+  { chord: "Em", lyric: "Camino solo por la arena" },
+  { chord: "Am", lyric: "Tu voz me sigue como estrella" },
+  { chord: "Dm", lyric: "No hay quizás, no hay tal vez" },
+  { chord: "E", lyric: "Solo existe este momento" },
+];
 
+/**
+ * ChordDisplay — stage teleprompter component. Shows the active chord at
+ * full scale with a pulsing metronome animation, the next chord at 40%
+ * opacity, and the previous chord at 10% opacity. Lyrics are paired below
+ * each chord. Spacebar / Right arrow advances, Left arrow rewinds.
+ *
+ * @param activeIndex - Currently active chord index (0-7)
+ * @param onAdvance - Callback to advance to next chord
+ * @param onRewind - Callback to go to previous chord
+ */
+interface ChordDisplayProps {
+  activeIndex: number;
+}
+
+export default function ChordDisplay({ activeIndex }: ChordDisplayProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  /** Smooth-scroll the active chord into center view */
   useEffect(() => {
-    if (!containerRef.current) return;
-    let cancelled = false;
-
-    /** Animate a slow left-to-right drift so chords self-reveal over time */
-    import("gsap").then((gsapModule) => {
-      if (cancelled || !containerRef.current) return;
-      const gsap = gsapModule.default ?? gsapModule;
-      gsap.fromTo(
-        containerRef.current,
-        { x: 0 },
-        { x: -120, duration: 20, ease: "none", repeat: -1, yoyo: true }
-      );
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    const container = scrollRef.current;
+    if (!container) return;
+    const activeEl = container.querySelector(`[data-chord-idx="${activeIndex}"]`);
+    if (activeEl) {
+      activeEl.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+    }
+  }, [activeIndex]);
 
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center overflow-hidden pointer-events-none"
+      className="fixed inset-0 flex items-center justify-center overflow-hidden"
       style={{ zIndex: 9990 }}
-      aria-label="Chord progression display: Am, F, C, G, Em, Am, Dm, E"
-      role="img"
+      role="region"
+      aria-label={`Teleprompter: ${CHART[activeIndex]?.chord ?? ""} — ${CHART[activeIndex]?.lyric ?? ""}`}
+      aria-live="polite"
     >
-      <div ref={containerRef} className="flex gap-8 md:gap-16 flex-wrap justify-center px-8">
-        {CHORDS.map((chord, i) => (
-          <span
-            key={`${chord}-${i}`}
-            className="font-clash font-bold select-none"
-            style={{
-              fontSize: "clamp(80px, 15vw, 180px)",
-              color: "#FFFFFF",
-              lineHeight: 1.1,
-              mixBlendMode: "screen",
-            }}
-          >
-            {chord}
-          </span>
-        ))}
+      <div
+        ref={scrollRef}
+        className="flex flex-col items-center gap-4 w-full max-w-3xl px-8 overflow-y-auto max-h-[80vh] py-24 scrollbar-hide"
+      >
+        {CHART.map((item, i) => {
+          const isActive = i === activeIndex;
+          const isNext = i === activeIndex + 1;
+          const isPrev = i === activeIndex - 1;
+          const opacity = isActive ? 1 : isNext ? 0.4 : isPrev ? 0.1 : 0.05;
+
+          return (
+            <div
+              key={i}
+              data-chord-idx={i}
+              className="text-center transition-all duration-500 ease-out w-full"
+              style={{ opacity }}
+            >
+              <AnimatePresence mode="sync">
+                <motion.span
+                  key={`chord-${i}-${isActive}`}
+                  className="font-clash font-bold block select-none"
+                  style={{
+                    fontSize: isActive ? "clamp(120px, 20vw, 200px)" : "clamp(48px, 8vw, 80px)",
+                    color: "#F0F0F8",
+                    textShadow: isActive
+                      ? "0 0 40px rgba(0, 212, 255, 0.4), 0 0 80px rgba(0, 212, 255, 0.15)"
+                      : "none",
+                    lineHeight: 1.1,
+                    animation: isActive ? "chordPulse 500ms ease-in-out infinite" : "none",
+                    transition: "font-size 0.5s ease, text-shadow 0.5s ease",
+                  }}
+                >
+                  {item.chord}
+                </motion.span>
+              </AnimatePresence>
+
+              {/* Lyric line — only visible on active chord */}
+              <div
+                className="overflow-hidden transition-all duration-500"
+                style={{
+                  maxHeight: isActive ? "60px" : "0px",
+                  opacity: isActive ? 0.7 : 0,
+                }}
+              >
+                <p className="font-cormorant italic text-es-text-secondary text-xl mt-2">
+                  {item.lyric}
+                </p>
+              </div>
+            </div>
+          );
+        })}
       </div>
+
+      {/* Metronome pulse keyframe */}
+      <style jsx global>{`
+        @keyframes chordPulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.02); }
+        }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
     </div>
   );
 }

@@ -2,19 +2,26 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { useAppStore } from "@/store/useAppStore";
 
 /**
- * Unit tests for Gig Mode state management and component logic.
- * Tests verify Zustand state transitions for isGigModeActive.
- * Browser-dependent components (SpotlightCursor, ChordDisplay) are
+ * Unit tests for Gig Mode state management and teleprompter logic.
+ * Browser-dependent components (ChordDisplay, GigModeAudio) are
  * tested at the integration level — here we test state and data.
  */
 
-const CHORDS = ["Am", "F", "C", "G", "Em", "Am", "Dm", "E"];
+const CHART = [
+  { chord: "Am", lyric: "No hay quizás en esta noche" },
+  { chord: "F", lyric: "Solo tú y el mar abierto" },
+  { chord: "C", lyric: "Las olas cantan lo que siento" },
+  { chord: "G", lyric: "Y el viento sabe mi secreto" },
+  { chord: "Em", lyric: "Camino solo por la arena" },
+  { chord: "Am", lyric: "Tu voz me sigue como estrella" },
+  { chord: "Dm", lyric: "No hay quizás, no hay tal vez" },
+  { chord: "E", lyric: "Solo existe este momento" },
+];
 
 describe("Gig Mode", () => {
   beforeEach(() => {
     useAppStore.setState({
       isGigModeActive: false,
-      mouseCoordinates: { x: 0, y: 0 },
       audioContextStarted: false,
     });
   });
@@ -34,30 +41,28 @@ describe("Gig Mode", () => {
     expect(useAppStore.getState().isGigModeActive).toBe(false);
   });
 
-  it("mouseCoordinates update correctly for spotlight tracking", () => {
-    useAppStore.getState().setMouseCoordinates({ x: 500, y: 300 });
-    const { mouseCoordinates } = useAppStore.getState();
-    expect(mouseCoordinates.x).toBe(500);
-    expect(mouseCoordinates.y).toBe(300);
+  it("chord chart contains all 8 entries with lyrics", () => {
+    expect(CHART).toHaveLength(8);
+    CHART.forEach((entry) => {
+      expect(entry.chord.length).toBeGreaterThan(0);
+      expect(entry.lyric.length).toBeGreaterThan(0);
+    });
   });
 
-  it("chord progression contains all 8 expected chords", () => {
-    expect(CHORDS).toHaveLength(8);
-    expect(CHORDS).toContain("Am");
-    expect(CHORDS).toContain("F");
-    expect(CHORDS).toContain("C");
-    expect(CHORDS).toContain("G");
-    expect(CHORDS).toContain("Em");
-    expect(CHORDS).toContain("Dm");
-    expect(CHORDS).toContain("E");
+  it("chord progression contains expected chords", () => {
+    const chords = CHART.map((c) => c.chord);
+    expect(chords).toContain("Am");
+    expect(chords).toContain("F");
+    expect(chords).toContain("C");
+    expect(chords).toContain("G");
+    expect(chords).toContain("Em");
+    expect(chords).toContain("Dm");
+    expect(chords).toContain("E");
   });
 
   it("Escape key exit: state transitions from active to inactive", () => {
-    // Simulate the Escape key flow at the state level
     useAppStore.getState().setGigModeActive(true);
     expect(useAppStore.getState().isGigModeActive).toBe(true);
-
-    // Escape handler calls setGigModeActive(false)
     useAppStore.getState().setGigModeActive(false);
     expect(useAppStore.getState().isGigModeActive).toBe(false);
   });
@@ -66,5 +71,18 @@ describe("Gig Mode", () => {
     expect(useAppStore.getState().audioContextStarted).toBe(false);
     useAppStore.getState().setAudioContextStarted(true);
     expect(useAppStore.getState().audioContextStarted).toBe(true);
+  });
+
+  it("active chord index stays within bounds", () => {
+    let idx = 0;
+    // Advance
+    idx = Math.min(idx + 1, CHART.length - 1);
+    expect(idx).toBe(1);
+    // Advance to end
+    for (let i = 0; i < 20; i++) idx = Math.min(idx + 1, CHART.length - 1);
+    expect(idx).toBe(7);
+    // Rewind to start
+    for (let i = 0; i < 20; i++) idx = Math.max(idx - 1, 0);
+    expect(idx).toBe(0);
   });
 });
