@@ -46,7 +46,7 @@ export default function StepList({ activeStep }: StepListProps) {
           <div
             key={step.num}
             id={`hiw-step-${step.num}`}
-            className="py-10 transition-all duration-500"
+            className="py-16 min-h-[200px] transition-all duration-500"
           >
             <div className="flex items-start gap-5">
               <span
