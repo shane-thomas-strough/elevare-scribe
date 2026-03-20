@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useAppStore } from "@/store/useAppStore";
+import { AUDIO } from "@/config/audio";
 
 const TRACKS = [
-  { id: "no-hay-quizas", label: "No Hay Quizas", url: "/audio/no-hay-quizas-demo.mp3" },
-  { id: "hammocks", label: "Hammocks and Hardhats", url: "/audio/hammocks-and-hardhats-demo.mp3" },
+  { id: "no-hay-quizas", label: "No Hay Quizas", url: AUDIO.NO_HAY_QUIZAS },
+  { id: "hammocks", label: "Hammocks and Hardhats", url: AUDIO.HAMMOCKS },
 ];
 
 export default function Step5Preview() {

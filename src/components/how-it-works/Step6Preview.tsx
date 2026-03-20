@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useAppStore } from "@/store/useAppStore";
+import { AUDIO } from "@/config/audio";
 
 const STEMS = [
   { key: "vocal" as const, label: "Vocals", color: "#00D4FF" },
@@ -11,7 +12,7 @@ const STEMS = [
   { key: "drums" as const, label: "Drums", color: "#00FF88" },
 ];
 
-const AUDIO_SRC = "/audio/double-overhead-demo.mp3";
+const AUDIO_SRC = AUDIO.DOUBLE_OVERHEAD;
 
 type ExportPhase = "idle" | "exporting" | "done";
 

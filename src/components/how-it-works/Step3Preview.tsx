@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useAppStore } from "@/store/useAppStore";
+import { AUDIO } from "@/config/audio";
 
 const KEY_NAMES = ["Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B", "C", "C#", "D", "Eb"];
 // Slider range: -6 to +6, index 0..12 maps to KEY_NAMES
@@ -157,7 +158,7 @@ export default function Step3Preview() {
 
     const pitchShift = new Tone.PitchShift({ pitch: 0 }).toDestination();
     const player = new Tone.Player({
-      url: "/audio/no-hay-quizas-demo.mp3",
+      url: AUDIO.NO_HAY_QUIZAS,
       loop: true,
     }).connect(pitchShift);
 

@@ -35,8 +35,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# demo source files (large WAVs)
+# demo source files
 /demo-songs/
 
-# large WAV files in public (use MP3 versions for git)
+# audio files served from R2
 public/audio/*.wav
+public/audio/*.mp3
