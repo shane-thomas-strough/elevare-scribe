@@ -20,9 +20,9 @@ const STEM_URLS = {
   drums: "https://pub-e61c949869c44bf9b2e5bcf648b7347f.r2.dev/Drums%20-%20No-Hay-Quiz%C3%A1s-Demo%20-%20140bpm%20-%20Bmaj.mp3",
 } as const;
 
-/** Placeholder MusicXML — swap for No Hay Quizás when available */
+/** No Hay Quizás MusicXML — rendered by OSMD with cursor synced to audio */
 const MUSICXML_URL =
-  "https://opensheetmusicdisplay.github.io/demo/sheets/MuzioClementi_SonatinaOpus36No1_Part1.xml";
+  "https://pub-e61c949869c44bf9b2e5bcf648b7347f.r2.dev/No-Hay-Quizas-Demo.xml";
 
 type StemKey = "vocal" | "guitar" | "bass" | "drums";
 
