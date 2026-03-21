@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAppStore } from "@/store/useAppStore";
 
 /**
  * Stop 4 — The resolution. The product materializes as the answer.
@@ -32,14 +33,9 @@ export default function Stop4({ active }: Stop4Props) {
     };
   }, [active]);
 
-  /** Scroll to pricing section (or bottom of page as placeholder) */
+  /** Open the waitlist modal — the primary conversion action */
   const handleCTA = () => {
-    const pricing = document.getElementById("pricing");
-    if (pricing) {
-      pricing.scrollIntoView({ behavior: "smooth" });
-    } else {
-      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-    }
+    useAppStore.getState().openWaitlistModal();
   };
 
   return (
