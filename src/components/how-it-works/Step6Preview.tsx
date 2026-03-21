@@ -21,12 +21,11 @@ import { useAppStore } from "@/store/useAppStore";
  * master track, the resulting files are uploaded to R2 and their URLs
  * are placed here. Each stem is a separate isolated audio file.
  */
-// TODO: Insert R2 stem URLs here after running Demucs on Double Overhead
 const STEM_URLS = {
-  vocal: "",
-  guitar: "",
-  bass: "",
-  drums: "",
+  vocal: "https://pub-e61c949869c44bf9b2e5bcf648b7347f.r2.dev/Vocals%20-%20No-Hay-Quiz%C3%A1s-Demo%20-%20140bpm%20-%20Bmaj.mp3",
+  guitar: "https://pub-e61c949869c44bf9b2e5bcf648b7347f.r2.dev/Instrumental%20-%20No-Hay-Quiz%C3%A1s-Demo%20-%20140bpm%20-%20Bmaj.mp3",
+  bass: "https://pub-e61c949869c44bf9b2e5bcf648b7347f.r2.dev/Bass%20-%20No-Hay-Quiz%C3%A1s-Demo%20-%20140bpm%20-%20Bmaj.mp3",
+  drums: "https://pub-e61c949869c44bf9b2e5bcf648b7347f.r2.dev/Drums%20-%20No-Hay-Quiz%C3%A1s-Demo%20-%20140bpm%20-%20Bmaj.mp3",
 } as const;
 
 const STEMS = [
