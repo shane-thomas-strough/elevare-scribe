@@ -38,9 +38,10 @@ export default function WaitlistModal() {
         return;
       }
 
+      const referralLink = `${window.location.origin}?ref=${data.referralCode ?? data.referral_code ?? ""}`;
       setSuccess({
         position: data.position,
-        referralLink: data.referralLink,
+        referralLink,
       });
     } catch {
       setError("Something went wrong. Please try again.");
