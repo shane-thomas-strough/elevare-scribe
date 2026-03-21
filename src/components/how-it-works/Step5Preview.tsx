@@ -3,32 +3,48 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useAppStore } from "@/store/useAppStore";
-import { AUDIO } from "@/config/audio";
 
 /**
- * Step5Preview — Practice Mode demo. Plays real audio from R2 via Tone.js.
- * Progress bar syncs to actual buffer duration. Live waveform visualizer
- * draws AnalyserNode frequency data on a Canvas element. Loop restarts
- * from 0 on track end; non-loop stops and resets.
+ * Step5Preview — Practice Mode with true multi-track stem playback.
+ *
+ * Architecture per stem:
+ *   Tone.Player(stemUrl) → Tone.Volume(dB) → Tone.getDestination()
+ *
+ * Stem toggle buttons mute/unmute by setting the corresponding
+ * Tone.Volume node to -Infinity dB or 0 dB. No averaging, no
+ * shared gain. All four players start simultaneously for sync.
+ *
+ * The AnalyserNode for the waveform visualizer is connected to
+ * Tone.getDestination() so it reflects the mixed output.
  */
 
-const TRACKS = [
-  { id: "no-hay-quizas", label: "No Hay Quizás", url: AUDIO.NO_HAY_QUIZAS },
-  { id: "hammocks", label: "Hammocks and Hardhats", url: AUDIO.HAMMOCKS },
-];
+const STEM_URLS = {
+  vocal: "https://pub-e61c949869c44bf9b2e5bcf648b7347f.r2.dev/Vocals%20-%20No-Hay-Quiz%C3%A1s-Demo%20-%20140bpm%20-%20Bmaj.mp3",
+  guitar: "https://pub-e61c949869c44bf9b2e5bcf648b7347f.r2.dev/Instrumental%20-%20No-Hay-Quiz%C3%A1s-Demo%20-%20140bpm%20-%20Bmaj.mp3",
+  bass: "https://pub-e61c949869c44bf9b2e5bcf648b7347f.r2.dev/Bass%20-%20No-Hay-Quiz%C3%A1s-Demo%20-%20140bpm%20-%20Bmaj.mp3",
+  drums: "https://pub-e61c949869c44bf9b2e5bcf648b7347f.r2.dev/Drums%20-%20No-Hay-Quiz%C3%A1s-Demo%20-%20140bpm%20-%20Bmaj.mp3",
+} as const;
 
-const STEM_TOGGLES = [
+type StemKey = "vocal" | "guitar" | "bass" | "drums";
+
+const STEM_TOGGLES: { key: StemKey; label: string; color: string }[] = [
   { key: "vocal", label: "Vocals", color: "#00D4FF" },
   { key: "guitar", label: "Guitar", color: "#C7973A" },
   { key: "bass", label: "Bass", color: "#7B2FBE" },
   { key: "drums", label: "Drums", color: "#00FF88" },
-] as const;
+];
 
-/** Format seconds as m:ss */
 function fmtTime(s: number): string {
   const m = Math.floor(s / 60);
   const sec = Math.floor(s % 60);
   return `${m}:${String(sec).padStart(2, "0")}`;
+}
+
+interface StemNode {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  player: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  volume: any;
 }
 
 export default function Step5Preview() {
@@ -37,11 +53,11 @@ export default function Step5Preview() {
   const [looping, setLooping] = useState(true);
   const [cursorPos, setCursorPos] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [activeTrack, setActiveTrack] = useState(0);
   const [mutedStems, setMutedStems] = useState<Set<string>>(new Set());
+  const [isLoading, setIsLoading] = useState(false);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const toneRef = useRef<{ player: any; module: any; analyser: AnalyserNode | null } | null>(null);
+  const rigsRef = useRef<Record<string, StemNode>>({});
+  const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -58,31 +74,30 @@ export default function Step5Preview() {
     const animate = () => {
       if (!mountedRef.current) return;
 
-      // Progress from actual elapsed time
-      if (toneRef.current?.player && duration > 0) {
-        const rate = toneRef.current.player.playbackRate;
-        const elapsed = (performance.now() - playStartRef.current) / 1000 * rate;
-        const totalDur = duration;
+      // Progress from elapsed time × playback rate
+      const firstRig = Object.values(rigsRef.current)[0];
+      if (firstRig?.player && duration > 0) {
+        const rate = firstRig.player.playbackRate;
+        const elapsed = ((performance.now() - playStartRef.current) / 1000) * rate;
 
-        if (elapsed >= totalDur) {
+        if (elapsed >= duration) {
           if (looping) {
-            // Reset start reference for next loop iteration
             playStartRef.current = performance.now();
             setCursorPos(0);
           } else {
-            toneRef.current.player.stop();
+            Object.values(rigsRef.current).forEach((r) => r.player.stop());
             setIsPlaying(false);
             setCursorPos(0);
             return;
           }
         } else {
-          setCursorPos(elapsed / totalDur);
+          setCursorPos(elapsed / duration);
         }
       }
 
-      // Draw waveform from AnalyserNode
+      // Draw waveform from AnalyserNode (reflects mixed output)
       const canvas = canvasRef.current;
-      const analyser = toneRef.current?.analyser;
+      const analyser = analyserRef.current;
       if (canvas && analyser) {
         const ctx = canvas.getContext("2d");
         if (ctx) {
@@ -127,87 +142,111 @@ export default function Step5Preview() {
     };
   }, [isPlaying, duration, looping]);
 
-  // ── Switch track ────────────────────────────────────────────────
-  const switchTrack = useCallback(
-    (idx: number) => {
-      if (idx === activeTrack) return;
-      toneRef.current?.player?.stop();
-      toneRef.current?.player?.dispose();
-      toneRef.current = null;
-      setIsPlaying(false);
-      setCursorPos(0);
-      setDuration(0);
-      setActiveTrack(idx);
-    },
-    [activeTrack]
-  );
-
-  // ── Toggle playback ────────────────────────────────────────────
+  // ── Toggle playback — builds multi-track rig on first play ──────
   const togglePlayback = useCallback(async () => {
     if (isPlaying) {
-      toneRef.current?.player?.stop();
+      Object.values(rigsRef.current).forEach((r) => r.player.stop());
       setIsPlaying(false);
       return;
     }
 
-    if (!toneRef.current) {
+    try {
+      setIsLoading(true);
       const Tone = await import("tone");
       await Tone.start();
       setAudioContextStarted(true);
 
-      const player = new Tone.Player({
-        url: TRACKS[activeTrack]?.url ?? TRACKS[0]!.url,
-        loop: looping,
-      }).toDestination();
+      // Build per-stem rigs if not yet created
+      if (Object.keys(rigsRef.current).length === 0) {
+        for (const stem of STEM_TOGGLES) {
+          const url = STEM_URLS[stem.key];
+          if (!url) continue;
 
-      // Create AnalyserNode from the raw AudioContext for waveform drawing
-      const rawCtx = Tone.getContext().rawContext;
-      let analyser: AnalyserNode | null = null;
-      if (rawCtx instanceof AudioContext) {
-        analyser = rawCtx.createAnalyser();
-        analyser.fftSize = 2048;
-        Tone.getDestination().connect(analyser);
+          const vol = new Tone.Volume(0).toDestination();
+          const player = new Tone.Player({ url, loop: looping }).connect(vol);
+
+          rigsRef.current[stem.key] = { player, volume: vol };
+        }
+
+        // AnalyserNode on the mixed output for waveform drawing
+        const rawCtx = Tone.getContext().rawContext;
+        if (rawCtx instanceof AudioContext) {
+          const analyser = rawCtx.createAnalyser();
+          analyser.fftSize = 2048;
+          Tone.getDestination().connect(analyser);
+          analyserRef.current = analyser;
+        }
+
+        await Tone.loaded();
+
+        // Read duration from the first loaded stem
+        const firstPlayer = Object.values(rigsRef.current)[0]?.player;
+        if (firstPlayer?.buffer?.duration) {
+          setDuration(firstPlayer.buffer.duration);
+        }
       }
 
-      toneRef.current = { player, module: Tone, analyser };
+      // Apply current mute states before starting
+      for (const stem of STEM_TOGGLES) {
+        const rig = rigsRef.current[stem.key];
+        if (rig) {
+          rig.volume.volume.value = mutedStems.has(stem.key) ? -Infinity : 0;
+        }
+      }
 
-      await new Promise<void>((resolve) => {
-        if (player.loaded) resolve();
-        else player.buffer.onload = () => resolve();
+      // Apply tempo to all players
+      Object.values(rigsRef.current).forEach((r) => {
+        r.player.playbackRate = tempo / 100;
+        r.player.loop = looping;
       });
 
-      // Read real buffer duration
-      setDuration(player.buffer.duration);
+      // Synchronized start
+      const startTime = Tone.now();
+      Object.values(rigsRef.current).forEach((r) => r.player.start(startTime));
+      playStartRef.current = performance.now();
+      setIsPlaying(true);
+    } catch (err) {
+      console.error("Step5Preview: multi-track init failed", err);
+    } finally {
+      setIsLoading(false);
     }
+  }, [isPlaying, tempo, looping, setAudioContextStarted, mutedStems]);
 
-    toneRef.current.player.playbackRate = tempo / 100;
-    toneRef.current.player.loop = looping;
-    playStartRef.current = performance.now();
-    toneRef.current.player.start();
-    setIsPlaying(true);
-  }, [isPlaying, tempo, looping, setAudioContextStarted, activeTrack]);
-
-  // ── Sync playback rate on tempo change ─────────────────────────
+  // ── Apply mute/unmute to Tone.Volume nodes in real time ─────────
   useEffect(() => {
-    if (toneRef.current?.player) {
-      toneRef.current.player.playbackRate = tempo / 100;
+    for (const stem of STEM_TOGGLES) {
+      const rig = rigsRef.current[stem.key];
+      if (rig) {
+        rig.volume.volume.value = mutedStems.has(stem.key) ? -Infinity : 0;
+      }
     }
+  }, [mutedStems]);
+
+  // ── Sync playback rate on tempo change ──────────────────────────
+  useEffect(() => {
+    Object.values(rigsRef.current).forEach((r) => {
+      r.player.playbackRate = tempo / 100;
+    });
   }, [tempo]);
 
-  // ── Sync loop setting ──────────────────────────────────────────
+  // ── Sync loop setting ───────────────────────────────────────────
   useEffect(() => {
-    if (toneRef.current?.player) {
-      toneRef.current.player.loop = looping;
-    }
+    Object.values(rigsRef.current).forEach((r) => {
+      r.player.loop = looping;
+    });
   }, [looping]);
 
-  // ── Cleanup on unmount ─────────────────────────────────────────
+  // ── Cleanup on unmount ──────────────────────────────────────────
   useEffect(() => {
     return () => {
       mountedRef.current = false;
-      toneRef.current?.player?.stop();
-      toneRef.current?.player?.dispose();
-      toneRef.current = null;
+      Object.values(rigsRef.current).forEach((r) => {
+        r.player.stop();
+        r.player.dispose();
+        r.volume.dispose();
+      });
+      rigsRef.current = {};
+      analyserRef.current = null;
     };
   }, []);
 
@@ -229,21 +268,14 @@ export default function Step5Preview() {
       transition={{ duration: 0.4 }}
       className="flex flex-col h-full"
     >
-      {/* Track switcher */}
-      <div className="px-4 pt-3 pb-2 border-b border-es-border flex items-center gap-2">
-        {TRACKS.map((track, idx) => (
-          <button
-            key={track.id}
-            onClick={() => switchTrack(idx)}
-            className={`px-3 py-1.5 rounded-md text-xs font-inter transition-colors ${
-              idx === activeTrack
-                ? "bg-es-cyan/10 border border-es-cyan/40 text-es-cyan"
-                : "border border-es-border text-es-text-tertiary hover:text-es-text-secondary"
-            }`}
-          >
-            {track.label}
-          </button>
-        ))}
+      {/* Track label */}
+      <div className="px-4 pt-3 pb-2 border-b border-es-border flex items-center justify-between">
+        <span className="text-es-text-secondary text-xs font-inter">
+          No Hay Quizás — Practice Mode
+        </span>
+        {isLoading && (
+          <span className="text-es-cyan text-[10px] font-mono animate-pulse">Loading stems...</span>
+        )}
       </div>
 
       {/* Progress bar synced to real buffer duration */}
@@ -277,7 +309,7 @@ export default function Step5Preview() {
         </div>
       </div>
 
-      {/* Stem mute toggles */}
+      {/* Stem mute toggles — wired to Tone.Volume nodes */}
       <div className="px-4 py-2 flex items-center gap-2 flex-wrap">
         {STEM_TOGGLES.map((stem) => {
           const isMuted = mutedStems.has(stem.key);
@@ -304,7 +336,7 @@ export default function Step5Preview() {
         </span>
       </div>
 
-      {/* Live waveform visualizer — Canvas AnalyserNode */}
+      {/* Live waveform visualizer */}
       <div className="flex-1 px-4 py-2 min-h-0">
         <canvas
           ref={canvasRef}
@@ -319,6 +351,7 @@ export default function Step5Preview() {
       <div className="px-4 py-3 border-t border-es-border flex items-center gap-4">
         <button
           onClick={togglePlayback}
+          disabled={isLoading}
           className="w-10 h-10 rounded-full bg-es-cyan/10 border border-es-cyan/30 flex items-center justify-center text-es-cyan hover:bg-es-cyan/20 transition-colors"
         >
           {isPlaying ? (
