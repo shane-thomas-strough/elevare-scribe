@@ -43,7 +43,7 @@ const cardVariants = {
 
 export default function ValuePropsSection() {
   return (
-    <section className="relative w-full bg-es-bg-primary py-24 md:py-32">
+    <section id="features" className="relative w-full bg-es-bg-primary py-24 md:py-32">
       <div className="mx-auto max-w-6xl px-6">
         {/* Section headline */}
         <motion.h2

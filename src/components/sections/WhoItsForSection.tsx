@@ -57,7 +57,7 @@ export default function WhoItsForSection() {
   const [hoveredCard, setHoveredCard] = useState<number | null>(null);
 
   return (
-    <section className="relative w-full bg-es-bg-primary py-24 md:py-32">
+    <section id="artists" className="relative w-full bg-es-bg-primary py-24 md:py-32">
       <div className="mx-auto max-w-5xl px-6">
         <motion.h2
           className="mb-16 text-center font-clash text-3xl font-medium leading-tight text-es-text-primary md:text-5xl"
