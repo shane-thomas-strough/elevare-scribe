@@ -21,7 +21,7 @@ interface UseCreditsReturn {
 }
 
 const DEFAULT_CREDITS: UserCredits = {
-  credits_remaining: 3,
+  credits_remaining: 5,
   credits_used: 0,
   tier: "free",
   credits_reset_at: null,

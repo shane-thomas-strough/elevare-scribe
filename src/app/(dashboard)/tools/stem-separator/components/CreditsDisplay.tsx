@@ -18,7 +18,7 @@ export function CreditsDisplay({
   tier,
   loading = false,
 }: CreditsDisplayProps): ReactElement {
-  const totalCredits = tier === "free" ? 3 : tier === "pro" ? 50 : 3;
+  const totalCredits = tier === "free" ? 5 : tier === "pro" ? 50 : 5;
 
   if (loading) {
     return (
