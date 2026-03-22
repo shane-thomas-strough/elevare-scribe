@@ -21,7 +21,7 @@ interface UseCreditsReturn {
 }
 
 const DEFAULT_CREDITS: UserCredits = {
-  credits_remaining: 3, // PRD: 3 free transcriptions per month
+  credits_remaining: 5,
   credits_used: 0,
   tier: "free",
   credits_reset_at: null,
@@ -30,7 +30,7 @@ const DEFAULT_CREDITS: UserCredits = {
 /**
  * Hook for managing user credits for stem separation.
  * Uses the existing `users` table with credits columns.
- * Free tier: 3 credits
+ * Free tier: 5 credits per month
  */
 export function useCredits(user: User | null): UseCreditsReturn {
   const [credits, setCredits] = useState<UserCredits | null>(null);

@@ -177,7 +177,7 @@ function LoginForm(): ReactElement {
                   d="M5 13l4 4L19 7"
                 />
               </svg>
-              <span className="font-inter text-sm">3 free separations per month</span>
+              <span className="font-inter text-sm">5 free separations per month</span>
             </div>
             <div className="flex items-center gap-3 text-es-text-secondary">
               <svg
