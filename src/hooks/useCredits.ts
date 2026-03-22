@@ -8,7 +8,7 @@ interface UserCredits {
   credits_remaining: number;
   credits_used: number;
   tier: string;
-  last_reset_at: string;
+  credits_reset_at: string | null;
 }
 
 interface UseCreditsReturn {
@@ -24,11 +24,12 @@ const DEFAULT_CREDITS: UserCredits = {
   credits_remaining: 3,
   credits_used: 0,
   tier: "free",
-  last_reset_at: new Date().toISOString(),
+  credits_reset_at: null,
 };
 
 /**
  * Hook for managing user credits for stem separation.
+ * Uses the existing `users` table with credits columns.
  * Free tier: 3 credits
  */
 export function useCredits(user: User | null): UseCreditsReturn {
@@ -46,41 +47,27 @@ export function useCredits(user: User | null): UseCreditsReturn {
     try {
       setError(null);
 
-      // First, try to get existing credits
+      // Fetch from users table using email (users table uses email as identifier)
       const { data, error: fetchError } = await supabaseBrowser
-        .from("user_credits")
-        .select("credits_remaining, credits_used, tier, last_reset_at")
-        .eq("user_id", user.id)
+        .from("users")
+        .select("credits_remaining, credits_used, tier, credits_reset_at")
+        .eq("email", user.email)
         .single();
 
       if (fetchError) {
-        // If no row exists, create one
-        if (fetchError.code === "PGRST116") {
-          const { data: newData, error: insertError } = await supabaseBrowser
-            .from("user_credits")
-            .insert({ user_id: user.id })
-            .select("credits_remaining, credits_used, tier, last_reset_at")
-            .single();
-
-          if (insertError) {
-            // If table doesn't exist yet, use defaults
-            if (insertError.code === "42P01") {
-              setCredits(DEFAULT_CREDITS);
-              setLoading(false);
-              return;
-            }
-            throw insertError;
-          }
-
-          setCredits(newData);
-        } else if (fetchError.code === "42P01") {
-          // Table doesn't exist yet - use defaults
+        // If no row exists or column doesn't exist yet, use defaults
+        if (fetchError.code === "PGRST116" || fetchError.code === "42703") {
           setCredits(DEFAULT_CREDITS);
         } else {
           throw fetchError;
         }
       } else {
-        setCredits(data);
+        setCredits({
+          credits_remaining: data.credits_remaining ?? 3,
+          credits_used: data.credits_used ?? 0,
+          tier: data.tier ?? "free",
+          credits_reset_at: data.credits_reset_at,
+        });
       }
     } catch (err) {
       console.error("Error fetching credits:", err);
@@ -104,17 +91,16 @@ export function useCredits(user: User | null): UseCreditsReturn {
 
     try {
       const { error: updateError } = await supabaseBrowser
-        .from("user_credits")
+        .from("users")
         .update({
           credits_remaining: credits.credits_remaining - 1,
           credits_used: credits.credits_used + 1,
-          updated_at: new Date().toISOString(),
         })
-        .eq("user_id", user.id);
+        .eq("email", user.email);
 
       if (updateError) {
-        // If table doesn't exist, still allow the operation
-        if (updateError.code === "42P01") {
+        // If column doesn't exist yet, still allow the operation locally
+        if (updateError.code === "42703") {
           setCredits((prev) =>
             prev
               ? {

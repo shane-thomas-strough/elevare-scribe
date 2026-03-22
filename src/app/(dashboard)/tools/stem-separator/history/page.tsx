@@ -9,6 +9,7 @@ import type { SeparationRecord } from "@/hooks/useSeparationHistory";
 
 /**
  * History page for viewing past stem separations.
+ * Uses the existing `projects` table.
  */
 export default function StemSeparatorHistoryPage(): ReactElement {
   const { user, loading: authLoading } = useAuth();
@@ -26,22 +27,41 @@ export default function StemSeparatorHistoryPage(): ReactElement {
     try {
       setError(null);
       const { data, error: fetchError } = await supabaseBrowser
-        .from("stem_separations")
-        .select("*")
+        .from("projects")
+        .select(
+          "id, track_id, original_url, song_title, video_author, thumbnail_url, processing_time_seconds, status, created_at, stem_vocals_url, stem_drums_url, stem_bass_url, stem_other_url"
+        )
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(50);
 
       if (fetchError) {
-        if (fetchError.code === "42P01") {
-          // Table doesn't exist yet
-          setHistory([]);
-          return;
-        }
         throw fetchError;
       }
 
-      setHistory(data || []);
+      // Transform data to match our interface
+      const transformed: SeparationRecord[] = (data || []).map((row) => ({
+        id: row.id,
+        track_id: row.track_id,
+        original_url: row.original_url,
+        song_title: row.song_title,
+        video_author: row.video_author,
+        thumbnail_url: row.thumbnail_url,
+        processing_time_seconds: row.processing_time_seconds,
+        status: row.status as "processing" | "completed" | "failed",
+        created_at: row.created_at,
+        stem_urls:
+          row.stem_vocals_url && row.stem_drums_url && row.stem_bass_url
+            ? {
+                vocals: row.stem_vocals_url,
+                drums: row.stem_drums_url,
+                bass: row.stem_bass_url,
+                other: row.stem_other_url || row.stem_vocals_url,
+              }
+            : null,
+      }));
+
+      setHistory(transformed);
     } catch (err) {
       console.error("Error fetching history:", err);
       setError("Could not load history");
@@ -208,7 +228,7 @@ function HistoryCard({ record, formatDate, formatDuration }: HistoryCardProps): 
           {record.thumbnail_url ? (
             <Image
               src={record.thumbnail_url}
-              alt={record.video_title || "Video thumbnail"}
+              alt={record.song_title || "Video thumbnail"}
               fill
               className="object-cover"
               unoptimized
@@ -229,7 +249,7 @@ function HistoryCard({ record, formatDate, formatDuration }: HistoryCardProps): 
         {/* Info */}
         <div className="flex-1 text-left min-w-0">
           <p className="font-inter font-medium text-es-text-primary truncate">
-            {record.video_title || "Unknown video"}
+            {record.song_title || "Unknown video"}
           </p>
           <p className="font-inter text-xs text-es-text-tertiary">
             {record.video_author || "Unknown artist"} • {formatDate(record.created_at)}

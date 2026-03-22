@@ -7,16 +7,20 @@ import type { SeparationResponse, YouTubeMetadata } from "@/lib/api/ai-engine";
 
 export interface SeparationRecord {
   id: string;
-  track_id: string;
-  youtube_url: string;
-  video_title: string | null;
+  track_id: string | null;
+  original_url: string;
+  song_title: string | null;
   video_author: string | null;
   thumbnail_url: string | null;
   processing_time_seconds: number | null;
-  stem_urls: SeparationResponse["stem_urls"] | null;
+  stem_urls: {
+    vocals: string;
+    drums: string;
+    bass: string;
+    other: string;
+  } | null;
   status: "processing" | "completed" | "failed";
   created_at: string;
-  completed_at: string | null;
 }
 
 interface UseSeparationHistoryReturn {
@@ -35,6 +39,7 @@ interface UseSeparationHistoryReturn {
 
 /**
  * Hook for managing stem separation history.
+ * Uses the existing `projects` table.
  */
 export function useSeparationHistory(user: User | null): UseSeparationHistoryReturn {
   const [history, setHistory] = useState<SeparationRecord[]>([]);
@@ -52,22 +57,41 @@ export function useSeparationHistory(user: User | null): UseSeparationHistoryRet
       setError(null);
 
       const { data, error: fetchError } = await supabaseBrowser
-        .from("stem_separations")
-        .select("*")
+        .from("projects")
+        .select(
+          "id, track_id, original_url, song_title, video_author, thumbnail_url, processing_time_seconds, status, created_at, stem_vocals_url, stem_drums_url, stem_bass_url, stem_other_url"
+        )
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(50);
 
       if (fetchError) {
-        // Table might not exist yet
-        if (fetchError.code === "42P01") {
-          setHistory([]);
-          return;
-        }
         throw fetchError;
       }
 
-      setHistory(data || []);
+      // Transform data to match our interface
+      const transformed: SeparationRecord[] = (data || []).map((row) => ({
+        id: row.id,
+        track_id: row.track_id,
+        original_url: row.original_url,
+        song_title: row.song_title,
+        video_author: row.video_author,
+        thumbnail_url: row.thumbnail_url,
+        processing_time_seconds: row.processing_time_seconds,
+        status: row.status as "processing" | "completed" | "failed",
+        created_at: row.created_at,
+        stem_urls:
+          row.stem_vocals_url && row.stem_drums_url && row.stem_bass_url
+            ? {
+                vocals: row.stem_vocals_url,
+                drums: row.stem_drums_url,
+                bass: row.stem_bass_url,
+                other: row.stem_other_url || row.stem_vocals_url, // fallback
+              }
+            : null,
+      }));
+
+      setHistory(transformed);
     } catch (err) {
       console.error("Error fetching history:", err);
       setError("Could not load history");
@@ -89,12 +113,12 @@ export function useSeparationHistory(user: User | null): UseSeparationHistoryRet
 
       try {
         const { data, error: insertError } = await supabaseBrowser
-          .from("stem_separations")
+          .from("projects")
           .insert({
             user_id: user.id,
             track_id: trackId,
-            youtube_url: youtubeUrl,
-            video_title: metadata?.title || null,
+            original_url: youtubeUrl,
+            song_title: metadata?.title || null,
             video_author: metadata?.author_name || null,
             thumbnail_url: metadata?.thumbnail_url || null,
             status: "processing",
@@ -103,8 +127,8 @@ export function useSeparationHistory(user: User | null): UseSeparationHistoryRet
           .single();
 
         if (insertError) {
-          // Table might not exist yet - return null but don't fail
-          if (insertError.code === "42P01") {
+          // Column might not exist yet - return null but don't fail
+          if (insertError.code === "42703") {
             return null;
           }
           throw insertError;
@@ -127,12 +151,14 @@ export function useSeparationHistory(user: User | null): UseSeparationHistoryRet
 
       try {
         await supabaseBrowser
-          .from("stem_separations")
+          .from("projects")
           .update({
             status: "completed",
             processing_time_seconds: result.processing_time_seconds,
-            stem_urls: result.stem_urls,
-            completed_at: new Date().toISOString(),
+            stem_vocals_url: result.stem_urls.vocals,
+            stem_drums_url: result.stem_urls.drums,
+            stem_bass_url: result.stem_urls.bass,
+            stem_other_url: result.stem_urls.other,
           })
           .eq("id", recordId);
       } catch (err) {
@@ -149,10 +175,9 @@ export function useSeparationHistory(user: User | null): UseSeparationHistoryRet
 
     try {
       await supabaseBrowser
-        .from("stem_separations")
+        .from("projects")
         .update({
           status: "failed",
-          completed_at: new Date().toISOString(),
         })
         .eq("id", recordId);
     } catch (err) {
