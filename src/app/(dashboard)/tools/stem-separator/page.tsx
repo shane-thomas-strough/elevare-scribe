@@ -1,12 +1,19 @@
 "use client";
 
 import { type ReactElement, useState, useEffect, useCallback } from "react";
-import { separateAudio, generateTrackId, type SeparationResponse } from "@/lib/api/ai-engine";
+import {
+  separateAudio,
+  generateTrackId,
+  fetchYouTubeMetadata,
+  type SeparationResponse,
+  type YouTubeMetadata,
+} from "@/lib/api/ai-engine";
 import { YouTubeInput } from "./components/YouTubeInput";
+import { YouTubePreview } from "./components/YouTubePreview";
 import { ProcessingStatus } from "./components/ProcessingStatus";
 import { StemPlayer } from "./components/StemPlayer";
 
-type PageState = "idle" | "processing" | "complete" | "error";
+type PageState = "idle" | "loading-preview" | "preview" | "processing" | "complete" | "error";
 
 /**
  * Stem Separator Tool Page
@@ -16,6 +23,8 @@ type PageState = "idle" | "processing" | "complete" | "error";
  */
 export default function StemSeparatorPage(): ReactElement {
   const [state, setState] = useState<PageState>("idle");
+  const [currentUrl, setCurrentUrl] = useState<string>("");
+  const [metadata, setMetadata] = useState<YouTubeMetadata | null>(null);
   const [result, setResult] = useState<SeparationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -37,25 +46,58 @@ export default function StemSeparatorPage(): ReactElement {
     };
   }, [state]);
 
-  const handleSubmit = useCallback(async (url: string) => {
-    setState("processing");
+  const handleSeparate = useCallback(
+    async (url?: string) => {
+      const targetUrl = url || currentUrl;
+      setState("processing");
+      setError(null);
+      setResult(null);
+
+      const trackId = generateTrackId();
+
+      try {
+        const response = await separateAudio(targetUrl, trackId);
+        setResult(response);
+        setState("complete");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "An unexpected error occurred");
+        setState("error");
+      }
+    },
+    [currentUrl]
+  );
+
+  const handleUrlSubmit = useCallback(async (url: string) => {
+    setCurrentUrl(url);
+    setState("loading-preview");
     setError(null);
-    setResult(null);
 
-    const trackId = generateTrackId();
-
-    try {
-      const response = await separateAudio(url, trackId);
-      setResult(response);
-      setState("complete");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An unexpected error occurred");
-      setState("error");
+    const meta = await fetchYouTubeMetadata(url);
+    if (meta) {
+      setMetadata(meta);
+      setState("preview");
+    } else {
+      // If metadata fails, still allow processing
+      setMetadata(null);
+      // Inline the processing logic to avoid dependency issues
+      setState("processing");
+      setResult(null);
+      const trackId = generateTrackId();
+      try {
+        const response = await separateAudio(url, trackId);
+        setResult(response);
+        setState("complete");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "An unexpected error occurred");
+        setState("error");
+      }
     }
   }, []);
 
   const handleReset = useCallback(() => {
     setState("idle");
+    setCurrentUrl("");
+    setMetadata(null);
     setResult(null);
     setError(null);
   }, []);
@@ -77,9 +119,9 @@ export default function StemSeparatorPage(): ReactElement {
         {/* Input Form - Show when idle or error */}
         {(state === "idle" || state === "error") && (
           <>
-            <YouTubeInput onSubmit={handleSubmit} disabled={false} />
+            <YouTubeInput onSubmit={handleUrlSubmit} disabled={false} />
             {error && (
-              <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-center">
+              <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-center max-w-md">
                 <p className="font-inter text-sm text-red-400">{error}</p>
                 <button
                   onClick={handleReset}
@@ -90,6 +132,23 @@ export default function StemSeparatorPage(): ReactElement {
               </div>
             )}
           </>
+        )}
+
+        {/* Loading Preview */}
+        {state === "loading-preview" && (
+          <div className="flex items-center gap-3 text-es-text-secondary">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-es-bg-tertiary border-t-es-cyan" />
+            <span className="font-inter text-sm">Loading video info...</span>
+          </div>
+        )}
+
+        {/* YouTube Preview */}
+        {state === "preview" && metadata && (
+          <YouTubePreview
+            metadata={metadata}
+            onSeparate={() => handleSeparate()}
+            disabled={false}
+          />
         )}
 
         {/* Processing Status */}
@@ -137,7 +196,7 @@ export default function StemSeparatorPage(): ReactElement {
             <div>
               <p className="font-inter font-medium text-es-text-primary">AI Processing</p>
               <p className="font-inter text-sm text-es-text-secondary">
-                Demucs separates the audio on RTX 5090
+                Demucs separates the audio in ~6 seconds
               </p>
             </div>
           </div>

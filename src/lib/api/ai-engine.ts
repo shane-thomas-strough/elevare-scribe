@@ -102,3 +102,36 @@ export function isValidYouTubeUrl(url: string): boolean {
   ];
   return patterns.some((pattern) => pattern.test(url));
 }
+
+/**
+ * YouTube video metadata from oEmbed API
+ */
+export interface YouTubeMetadata {
+  title: string;
+  author_name: string;
+  thumbnail_url: string;
+}
+
+/**
+ * Fetches YouTube video metadata using noembed (CORS-friendly oEmbed proxy).
+ *
+ * @param url - YouTube video URL
+ * @returns Video metadata or null if not found
+ */
+export async function fetchYouTubeMetadata(url: string): Promise<YouTubeMetadata | null> {
+  try {
+    const response = await fetch(`https://noembed.com/embed?url=${encodeURIComponent(url)}`);
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    if (data.error) return null;
+
+    return {
+      title: data.title,
+      author_name: data.author_name,
+      thumbnail_url: data.thumbnail_url,
+    };
+  } catch {
+    return null;
+  }
+}

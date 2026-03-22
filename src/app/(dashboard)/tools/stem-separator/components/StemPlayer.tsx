@@ -1,6 +1,7 @@
 "use client";
 
-import { type ReactElement, useState, useRef } from "react";
+import { type ReactElement, useState, useRef, useCallback } from "react";
+import JSZip from "jszip";
 
 interface StemUrls {
   vocals: string;
@@ -34,6 +35,7 @@ const STEM_CONFIG: StemConfig[] = [
  */
 export function StemPlayer({ stems, trackId, processingTime }: StemPlayerProps): ReactElement {
   const [playing, setPlaying] = useState<keyof StemUrls | null>(null);
+  const [downloading, setDownloading] = useState(false);
   const audioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
 
   const handlePlay = (stem: keyof StemUrls): void => {
@@ -61,6 +63,38 @@ export function StemPlayer({ stems, trackId, processingTime }: StemPlayerProps):
     setPlaying(null);
   };
 
+  const handleDownloadAll = useCallback(async () => {
+    setDownloading(true);
+
+    try {
+      const zip = new JSZip();
+
+      // Fetch all stems in parallel
+      const fetchPromises = STEM_CONFIG.map(async ({ key, label }) => {
+        const response = await fetch(stems[key]);
+        const blob = await response.blob();
+        zip.file(`${label.toLowerCase()}.mp3`, blob);
+      });
+
+      await Promise.all(fetchPromises);
+
+      // Generate and download ZIP
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${trackId}-stems.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to create ZIP:", error);
+    } finally {
+      setDownloading(false);
+    }
+  }, [stems, trackId]);
+
   return (
     <div className="w-full max-w-2xl">
       {/* Success Header */}
@@ -76,10 +110,10 @@ export function StemPlayer({ stems, trackId, processingTime }: StemPlayerProps):
 
       {/* Stem Grid */}
       <div className="grid grid-cols-2 gap-4">
-        {STEM_CONFIG.map(({ key, label, color, icon }) => (
+        {STEM_CONFIG.map(({ key, label, icon }) => (
           <div
             key={key}
-            className={`rounded-xl border border-es-border bg-es-bg-secondary p-4 transition-all hover:border-${color}/50`}
+            className="rounded-xl border border-es-border bg-es-bg-secondary p-4 transition-all hover:border-es-cyan/50"
           >
             {/* Hidden Audio Element */}
             <audio
@@ -121,20 +155,25 @@ export function StemPlayer({ stems, trackId, processingTime }: StemPlayerProps):
         ))}
       </div>
 
-      {/* Download All */}
+      {/* Download All ZIP */}
       <div className="mt-6 flex justify-center">
-        <div className="flex gap-3">
-          {STEM_CONFIG.map(({ key, label }) => (
-            <a
-              key={key}
-              href={stems[key]}
-              download={`${trackId}-${key}.mp3`}
-              className="rounded-lg border border-es-border px-4 py-2 font-inter text-sm text-es-text-secondary hover:border-es-cyan hover:text-es-cyan transition-all"
-            >
-              Download {label}
-            </a>
-          ))}
-        </div>
+        <button
+          onClick={handleDownloadAll}
+          disabled={downloading}
+          className="flex items-center gap-3 rounded-xl bg-es-cyan px-8 py-4 font-inter font-medium text-es-bg-primary transition-all hover:bg-es-cyan/90 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {downloading ? (
+            <>
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-es-bg-primary/30 border-t-es-bg-primary" />
+              <span>Creating ZIP...</span>
+            </>
+          ) : (
+            <>
+              <span>📦</span>
+              <span>Download All Stems (ZIP)</span>
+            </>
+          )}
+        </button>
       </div>
     </div>
   );
