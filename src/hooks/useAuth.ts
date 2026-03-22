@@ -12,7 +12,6 @@ interface AuthState {
 
 interface UseAuthReturn extends AuthState {
   signInWithGoogle: () => Promise<void>;
-  signInWithSpotify: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -66,17 +65,6 @@ export function useAuth(): UseAuthReturn {
     });
   }, []);
 
-  const signInWithSpotify = useCallback(async () => {
-    if (!supabaseBrowser) return;
-
-    await supabaseBrowser.auth.signInWithOAuth({
-      provider: "spotify",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/tools/stem-separator`,
-      },
-    });
-  }, []);
-
   const signOut = useCallback(async () => {
     if (!supabaseBrowser) return;
     await supabaseBrowser.auth.signOut();
@@ -85,7 +73,6 @@ export function useAuth(): UseAuthReturn {
   return {
     ...state,
     signInWithGoogle,
-    signInWithSpotify,
     signOut,
   };
 }
