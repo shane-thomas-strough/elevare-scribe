@@ -61,7 +61,7 @@ export function useAuth(): UseAuthReturn {
     await supabaseBrowser.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/tools/stem-separator`,
+        redirectTo: `${window.location.origin}/auth/callback?next=/tools/stem-separator`,
       },
     });
   }, []);
@@ -72,7 +72,7 @@ export function useAuth(): UseAuthReturn {
     await supabaseBrowser.auth.signInWithOAuth({
       provider: "spotify",
       options: {
-        redirectTo: `${window.location.origin}/tools/stem-separator`,
+        redirectTo: `${window.location.origin}/auth/callback?next=/tools/stem-separator`,
       },
     });
   }, []);
