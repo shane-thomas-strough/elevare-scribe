@@ -40,6 +40,41 @@ export interface SeparationError {
 }
 
 /**
+ * Parses error messages into user-friendly text
+ */
+function parseErrorMessage(detail: string): string {
+  const lowerDetail = detail.toLowerCase();
+
+  // YouTube-related errors
+  if (lowerDetail.includes("video unavailable") || lowerDetail.includes("private video")) {
+    return "This video is unavailable or private. Please try a different video.";
+  }
+  if (lowerDetail.includes("age-restricted") || lowerDetail.includes("sign in to confirm")) {
+    return "This video is age-restricted and cannot be processed.";
+  }
+  if (lowerDetail.includes("copyright") || lowerDetail.includes("blocked")) {
+    return "This video is blocked due to copyright restrictions.";
+  }
+  if (lowerDetail.includes("live stream") || lowerDetail.includes("premiere")) {
+    return "Live streams and premieres cannot be separated. Wait until the video is fully uploaded.";
+  }
+  if (lowerDetail.includes("no video formats") || lowerDetail.includes("unable to extract")) {
+    return "Could not extract audio from this video. It may be restricted or unavailable.";
+  }
+
+  // Network/server errors
+  if (lowerDetail.includes("timeout") || lowerDetail.includes("timed out")) {
+    return "Request timed out. The video might be too long. Try a shorter video (under 10 minutes).";
+  }
+  if (lowerDetail.includes("connection") || lowerDetail.includes("network")) {
+    return "Network error. Please check your connection and try again.";
+  }
+
+  // Default: return original message or generic
+  return detail || "An unexpected error occurred. Please try again.";
+}
+
+/**
  * Separates audio from a YouTube video into individual stems.
  *
  * @param youtubeUrl - Full YouTube video URL
@@ -72,7 +107,7 @@ export async function separateAudio(
 
   if (!response.ok) {
     const error: SeparationError = await response.json();
-    throw new Error(error.detail || "Failed to separate audio");
+    throw new Error(parseErrorMessage(error.detail));
   }
 
   return response.json();

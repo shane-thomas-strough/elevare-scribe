@@ -12,6 +12,8 @@ import { YouTubeInput } from "./components/YouTubeInput";
 import { YouTubePreview } from "./components/YouTubePreview";
 import { ProcessingStatus } from "./components/ProcessingStatus";
 import { StemPlayer } from "./components/StemPlayer";
+import { AuthGate } from "./components/AuthGate";
+import { useAuth } from "@/hooks/useAuth";
 
 type PageState = "idle" | "loading-preview" | "preview" | "processing" | "complete" | "error";
 
@@ -102,6 +104,8 @@ export default function StemSeparatorPage(): ReactElement {
     setError(null);
   }, []);
 
+  const { user, signOut } = useAuth();
+
   return (
     <div className="mx-auto max-w-4xl">
       {/* Page Header */}
@@ -114,65 +118,91 @@ export default function StemSeparatorPage(): ReactElement {
         </p>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex flex-col items-center gap-8">
-        {/* Input Form - Show when idle or error */}
-        {(state === "idle" || state === "error") && (
-          <>
-            <YouTubeInput onSubmit={handleUrlSubmit} disabled={false} />
-            {error && (
-              <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-center max-w-md">
-                <p className="font-inter text-sm text-red-400">{error}</p>
-                <button
-                  onClick={handleReset}
-                  className="mt-2 font-inter text-sm text-es-cyan hover:underline"
-                >
-                  Try again
-                </button>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Loading Preview */}
-        {state === "loading-preview" && (
-          <div className="flex items-center gap-3 text-es-text-secondary">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-es-bg-tertiary border-t-es-cyan" />
-            <span className="font-inter text-sm">Loading video info...</span>
+      {/* Auth Gate */}
+      <AuthGate>
+        {/* User Info Bar */}
+        {user && (
+          <div className="flex items-center justify-between mb-6 p-3 rounded-xl bg-es-bg-secondary border border-es-border">
+            <div className="flex items-center gap-3">
+              {user.user_metadata?.avatar_url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={user.user_metadata.avatar_url}
+                  alt="User avatar"
+                  className="w-8 h-8 rounded-full"
+                />
+              )}
+              <span className="font-inter text-sm text-es-text-primary">{user.email}</span>
+            </div>
+            <button
+              onClick={signOut}
+              className="font-inter text-xs text-es-text-tertiary hover:text-es-cyan transition-colors"
+            >
+              Sign out
+            </button>
           </div>
         )}
 
-        {/* YouTube Preview */}
-        {state === "preview" && metadata && (
-          <YouTubePreview
-            metadata={metadata}
-            onSeparate={() => handleSeparate()}
-            disabled={false}
-          />
-        )}
+        {/* Main Content Area */}
+        <div className="flex flex-col items-center gap-8">
+          {/* Input Form - Show when idle or error */}
+          {(state === "idle" || state === "error") && (
+            <>
+              <YouTubeInput onSubmit={handleUrlSubmit} disabled={false} />
+              {error && (
+                <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-center max-w-md">
+                  <p className="font-inter text-sm text-red-400">{error}</p>
+                  <button
+                    onClick={handleReset}
+                    className="mt-2 font-inter text-sm text-es-cyan hover:underline"
+                  >
+                    Try again
+                  </button>
+                </div>
+              )}
+            </>
+          )}
 
-        {/* Processing Status */}
-        {state === "processing" && (
-          <ProcessingStatus isProcessing={true} elapsedTime={elapsedTime} />
-        )}
+          {/* Loading Preview */}
+          {state === "loading-preview" && (
+            <div className="flex items-center gap-3 text-es-text-secondary">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-es-bg-tertiary border-t-es-cyan" />
+              <span className="font-inter text-sm">Loading video info...</span>
+            </div>
+          )}
 
-        {/* Results */}
-        {state === "complete" && result && (
-          <>
-            <StemPlayer
-              stems={result.stem_urls}
-              trackId={result.track_id}
-              processingTime={result.processing_time_seconds}
+          {/* YouTube Preview */}
+          {state === "preview" && metadata && (
+            <YouTubePreview
+              metadata={metadata}
+              onSeparate={() => handleSeparate()}
+              disabled={false}
             />
-            <button
-              onClick={handleReset}
-              className="rounded-xl border border-es-border px-6 py-3 font-inter text-sm text-es-text-secondary hover:border-es-cyan hover:text-es-cyan transition-all"
-            >
-              Separate Another Track
-            </button>
-          </>
-        )}
-      </div>
+          )}
+
+          {/* Processing Status */}
+          {state === "processing" && (
+            <ProcessingStatus isProcessing={true} elapsedTime={elapsedTime} />
+          )}
+
+          {/* Results */}
+          {state === "complete" && result && (
+            <>
+              <StemPlayer
+                stems={result.stem_urls}
+                trackId={result.track_id}
+                processingTime={result.processing_time_seconds}
+              />
+              <button
+                onClick={handleReset}
+                className="rounded-xl border border-es-border px-6 py-3 font-inter text-sm text-es-text-secondary hover:border-es-cyan hover:text-es-cyan transition-all"
+              >
+                Separate Another Track
+              </button>
+            </>
+          )}
+        </div>
+      </AuthGate>
 
       {/* Info Section */}
       <div className="mt-12 rounded-2xl border border-es-border bg-es-bg-secondary p-6">
