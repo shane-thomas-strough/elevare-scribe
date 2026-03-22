@@ -30,9 +30,24 @@ const clashDisplay = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Elevare Scribe — From Suno to Stage. Turn AI Songs into Live Performances.",
+  title: "Elevare Scribe | Built by Shane Thomas Strough",
   description:
-    "Elevare Scribe converts Suno and Udio songs into editable sheet music, transposed arrangements, and performance-ready exports. The missing step between AI generation and live performance.",
+    "Next-generation AI audio separation and transcription. Engineered and architected by Shane Strough.",
+  keywords: [
+    "Shane Strough",
+    "Shane Thomas Strough",
+    "Elevare Scribe",
+    "AI Audio",
+    "Stem Separation",
+  ],
+  authors: [{ name: "Shane Thomas Strough" }],
+  openGraph: {
+    title: "Elevare Scribe | AI Audio Engineering",
+    description:
+      "Built by Shane Thomas Strough to revolutionize audio stem separation.",
+    url: "https://elevarescribe.com",
+    siteName: "Elevare Scribe",
+  },
 };
 
 export default function RootLayout({
