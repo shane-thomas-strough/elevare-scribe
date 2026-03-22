@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactElement, useState, useEffect, useCallback } from "react";
+import { type ReactElement, useState, useEffect, useCallback, useRef } from "react";
 import {
   separateAudio,
   generateTrackId,
@@ -13,7 +13,10 @@ import { YouTubePreview } from "./components/YouTubePreview";
 import { ProcessingStatus } from "./components/ProcessingStatus";
 import { StemPlayer } from "./components/StemPlayer";
 import { AuthGate } from "./components/AuthGate";
+import { CreditsDisplay } from "./components/CreditsDisplay";
 import { useAuth } from "@/hooks/useAuth";
+import { useCredits } from "@/hooks/useCredits";
+import { useSeparationHistory } from "@/hooks/useSeparationHistory";
 
 type PageState = "idle" | "loading-preview" | "preview" | "processing" | "complete" | "error";
 
@@ -30,6 +33,19 @@ export default function StemSeparatorPage(): ReactElement {
   const [result, setResult] = useState<SeparationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
+
+  const { user, signOut } = useAuth();
+  const {
+    credits,
+    loading: creditsLoading,
+    canSeparate,
+    decrementCredits,
+    refreshCredits,
+  } = useCredits(user);
+  const { recordSeparation, completeSeparation, failSeparation } = useSeparationHistory(user);
+
+  // Track current separation record ID
+  const currentRecordIdRef = useRef<string | null>(null);
 
   // Timer for processing status
   useEffect(() => {
@@ -48,53 +64,91 @@ export default function StemSeparatorPage(): ReactElement {
     };
   }, [state]);
 
-  const handleSeparate = useCallback(
-    async (url?: string) => {
-      const targetUrl = url || currentUrl;
+  const performSeparation = useCallback(
+    async (url: string, meta: YouTubeMetadata | null) => {
+      // Check credits before processing
+      if (!canSeparate) {
+        setError("No credits remaining. Credits reset monthly.");
+        setState("error");
+        return;
+      }
+
       setState("processing");
       setError(null);
       setResult(null);
 
       const trackId = generateTrackId();
 
-      try {
-        const response = await separateAudio(targetUrl, trackId);
-        setResult(response);
-        setState("complete");
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An unexpected error occurred");
+      // Decrement credits before starting
+      const decremented = await decrementCredits();
+      if (!decremented) {
+        setError("Could not use credit. Please try again.");
         setState("error");
+        return;
       }
-    },
-    [currentUrl]
-  );
 
-  const handleUrlSubmit = useCallback(async (url: string) => {
-    setCurrentUrl(url);
-    setState("loading-preview");
-    setError(null);
+      // Record separation in history
+      const recordId = await recordSeparation(trackId, url, meta);
+      currentRecordIdRef.current = recordId;
 
-    const meta = await fetchYouTubeMetadata(url);
-    if (meta) {
-      setMetadata(meta);
-      setState("preview");
-    } else {
-      // If metadata fails, still allow processing
-      setMetadata(null);
-      // Inline the processing logic to avoid dependency issues
-      setState("processing");
-      setResult(null);
-      const trackId = generateTrackId();
       try {
         const response = await separateAudio(url, trackId);
         setResult(response);
         setState("complete");
+
+        // Update history record
+        if (recordId) {
+          await completeSeparation(recordId, response);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "An unexpected error occurred");
         setState("error");
+
+        // Mark separation as failed in history
+        if (recordId) {
+          await failSeparation(recordId);
+        }
+
+        // Refresh credits (in case there was an issue)
+        await refreshCredits();
       }
-    }
-  }, []);
+    },
+    [
+      canSeparate,
+      decrementCredits,
+      recordSeparation,
+      completeSeparation,
+      failSeparation,
+      refreshCredits,
+    ]
+  );
+
+  const handleSeparate = useCallback(
+    async (url?: string) => {
+      const targetUrl = url || currentUrl;
+      await performSeparation(targetUrl, metadata);
+    },
+    [currentUrl, metadata, performSeparation]
+  );
+
+  const handleUrlSubmit = useCallback(
+    async (url: string) => {
+      setCurrentUrl(url);
+      setState("loading-preview");
+      setError(null);
+
+      const meta = await fetchYouTubeMetadata(url);
+      if (meta) {
+        setMetadata(meta);
+        setState("preview");
+      } else {
+        // If metadata fails, still allow processing
+        setMetadata(null);
+        await performSeparation(url, null);
+      }
+    },
+    [performSeparation]
+  );
 
   const handleReset = useCallback(() => {
     setState("idle");
@@ -102,9 +156,8 @@ export default function StemSeparatorPage(): ReactElement {
     setMetadata(null);
     setResult(null);
     setError(null);
+    currentRecordIdRef.current = null;
   }, []);
-
-  const { user, signOut } = useAuth();
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -122,24 +175,46 @@ export default function StemSeparatorPage(): ReactElement {
       <AuthGate>
         {/* User Info Bar */}
         {user && (
-          <div className="flex items-center justify-between mb-6 p-3 rounded-xl bg-es-bg-secondary border border-es-border">
-            <div className="flex items-center gap-3">
-              {user.user_metadata?.avatar_url && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={user.user_metadata.avatar_url}
-                  alt="User avatar"
-                  className="w-8 h-8 rounded-full"
-                />
-              )}
-              <span className="font-inter text-sm text-es-text-primary">{user.email}</span>
+          <div className="flex flex-col gap-3 mb-6 p-4 rounded-xl bg-es-bg-secondary border border-es-border">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {user.user_metadata?.avatar_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={user.user_metadata.avatar_url}
+                    alt="User avatar"
+                    className="w-8 h-8 rounded-full"
+                  />
+                )}
+                <span className="font-inter text-sm text-es-text-primary">{user.email}</span>
+              </div>
+              <button
+                onClick={signOut}
+                className="font-inter text-xs text-es-text-tertiary hover:text-es-cyan transition-colors"
+              >
+                Sign out
+              </button>
             </div>
-            <button
-              onClick={signOut}
-              className="font-inter text-xs text-es-text-tertiary hover:text-es-cyan transition-colors"
-            >
-              Sign out
-            </button>
+            {/* Credits Display */}
+            <div className="flex items-center justify-between pt-2 border-t border-es-border">
+              <CreditsDisplay
+                creditsRemaining={credits?.credits_remaining ?? 0}
+                creditsUsed={credits?.credits_used ?? 0}
+                tier={credits?.tier ?? "free"}
+                loading={creditsLoading}
+              />
+              <div className="flex items-center gap-4">
+                <a
+                  href="/tools/stem-separator/history"
+                  className="font-inter text-xs text-es-text-tertiary hover:text-es-cyan transition-colors"
+                >
+                  View History
+                </a>
+                <a href="/pricing" className="font-inter text-xs text-es-cyan hover:underline">
+                  Upgrade for more
+                </a>
+              </div>
+            </div>
           </div>
         )}
 
@@ -173,11 +248,26 @@ export default function StemSeparatorPage(): ReactElement {
 
           {/* YouTube Preview */}
           {state === "preview" && metadata && (
-            <YouTubePreview
-              metadata={metadata}
-              onSeparate={() => handleSeparate()}
-              disabled={false}
-            />
+            <>
+              <YouTubePreview
+                metadata={metadata}
+                onSeparate={() => handleSeparate()}
+                disabled={!canSeparate || creditsLoading}
+              />
+              {!canSeparate && !creditsLoading && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-center max-w-md">
+                  <p className="font-inter text-sm text-amber-400">
+                    You&apos;ve used all your free credits. Upgrade to continue separating tracks.
+                  </p>
+                  <a
+                    href="/pricing"
+                    className="inline-block mt-3 rounded-lg bg-es-cyan px-4 py-2 font-inter text-sm font-medium text-es-bg-primary hover:bg-es-cyan/90 transition-colors"
+                  >
+                    View Pricing
+                  </a>
+                </div>
+              )}
+            </>
           )}
 
           {/* Processing Status */}
